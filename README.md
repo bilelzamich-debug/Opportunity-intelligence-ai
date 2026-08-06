@@ -1,37 +1,15 @@
-# Specifications
+# Examples
 
-Written specifications produced **before** implementation, per the working
-method's step 1: *extract, never recall*.
+Worked examples from the Intelligence Object Model, extracted so an
+implementer can see a fully-populated object of each type.
 
-| File | Task |
+| File | Contents |
 |---|---|
-| `T01.2.5-specification.md` | Retention / ARCHIVED tiering |
-| `T01.5.5-specification.md` | Calibration rubric |
-| `T01.6.2-specification.md` | Sequencing |
-| `T01.6.3-specification.md` | Failure surfacing |
-| `T01.6.4-specification.md` | Concurrency boundary |
-| `T01.6.5-specification.md` | Processing state |
-| `T02.1.1-specification.md` | Source model — **blocking escalation** |
+| [`worked-objects.md`](worked-objects.md) | Complete IOM examples for Evidence, Fact, Problem, Pattern |
+| [`confidence-worked-example.md`](confidence-worked-example.md) | The IOM §2.3 ceiling calculation, reproduced as a P1 test |
 
----
-
-## Structure
-
-Each specification lists, before any code is written:
-
-- governing sources, with line references
-- constraints
-- open markers
-- ambiguities
-- assumptions — and any assumption not directly supported by a ratified source
-  **must fail closed**
-
-## Why These Exist
-
-`T02.1.1-specification.md` is the clearest case. Rather than implementing a
-source taxonomy, it proved M-16 genuinely open and escalated — with the
-exhaustive extraction that made the escalation binding rather than an opinion.
-
-Had the task been implemented instead, an invented eight-member taxonomy would
-have entered the codebase with no record of where it came from. That is exactly
-the M-50 failure the project exists to avoid repeating.
+**These are illustrative, not normative.** The single `source_type` value
+appearing in the IOM Evidence example (`customer_review_corpus`) is inside a
+fenced code block under a `#### Example` heading — it is **not** a taxonomy
+member, and treating it as one was explicitly rejected during the M-16
+investigation.
