@@ -1,0 +1,22 @@
+{
+  "_comment": "Machine-readable performance baseline. Regenerate with: python3 benchmarks/bench_identity.py --write-baseline",
+  "_purpose": "Regression detection, not an optimisation target.",
+  "_thresholds": {
+    "throughput_regression_pct": 25.0,
+    "drift_regression_pct": 20.0,
+    "memory_regression_pct": 25.0
+  },
+  "python": "3.13.14",
+  "recorded": "2026-08-02",
+  "task": "T01.1.1",
+  "benchmarks": {
+    "new_object": { "ops_per_sec": 87406.0, "us_per_op": 11.44 },
+    "succeed (linear chain)": { "ops_per_sec": 174989.0, "us_per_op": 5.71 },
+    "validate_succession": { "ops_per_sec": 9895790.0, "us_per_op": 0.10 },
+    "assert_not_reused": { "ops_per_sec": 1471558.0, "us_per_op": 0.68 },
+    "lineage_of (500k populated)": { "ops_per_sec": 1704565.0, "us_per_op": 0.59 },
+    "new_object (concurrent)": { "ops_per_sec": 48094.0, "us_per_op": 20.79 },
+    "memory per identity": { "ops_per_sec": 13480.0, "us_per_op": 74.18, "bytes_per_identity": 295.0 },
+    "succeed (depth stability)": { "ops_per_sec": 177625.0, "us_per_op": 5.63, "drift_pct": 5.4 }
+  }
+}
