@@ -1,133 +1,152 @@
-# Validation Artefacts
+# Platform — Implementation
 
-Everything used to prove the implementation correct. **76 files.**
+The working implementation of the Opportunity Intelligence Platform.
 
-This directory is the reason defects were caught. It is not documentation of
-the work — it *is* the work.
-
----
-
-## Categories
-
-| Kind | Count | Naming | Purpose |
-|---|---|---|---|
-| Architecture verifiers | 8 | `verify_*.py`, `closure_*.py`, `exit_gate_*.py` | Check properties mechanically against ratified docs |
-| Adversarial probes | 22 | `probe_*.py` | Try to break the implementation *before* tests are written |
-| Mutation suites | 8 | `mutate_*.py` | Break each rule deliberately; the suite must fail |
-| Specifications | 8 | `*-specification.md` | Written before code, per task |
-| Reports | 4 | `*.md` | Closure, defect analyses, investigations |
-| Logs | 26 | `*.log` | Recorded runs, retained as evidence |
+| Metric | Value |
+|---|---|
+| Production modules | **29** (`oip/`) |
+| Production lines | **18,418** |
+| Test files | **37** (`tests/`) |
+| Unit tests | **3,201 passing** |
+| Stress tests | **128 passing** |
+| Coverage | **99.04%**, no module below 95% |
+| Architecture verifiers | **443 checks** |
 
 ---
 
-## Verifiers — 443 checks total
+## Layout
 
-| Script | Checks | Scope |
-|---|---|---|
-| `closure_t01_8_1.py` | **60** | Phase 1 closure — backlog, functional, defects, architecture, markers |
-| `exit_gate_t01_8_1_rerun.py` | **94** | 18 Definition-of-Done criteria + architectural validations |
-| `exit_gate_t01_8_1_tasks.py` | **26** | Per-task traceability |
-| `verify_t01_5_5.py` | 93 | Calibration rubric |
-| `verify_t01_2_5.py` | 77 | Retention |
-| `verify_t01_6_5.py` | 76 | Processing state |
-| `verify_t01_6_4.py` | 64 | Concurrency boundary |
-| `verify_t01_6_3.py` | 52 | Failure surfacing |
-| `verify_t01_6_2.py` | 43 | Sequencing |
-| `verify_t02_1_1.py` | **38** | Source model — open markers stay open |
-| `verify_t02_1_1_blocker.py` | **33** | M-16 blocker substantiation |
-
-```bash
-python validation/closure_t01_8_1.py          # 60/60
-python validation/exit_gate_t01_8_1_rerun.py  # 94/94
-python validation/verify_t02_1_1.py           # 38/38
+```
+platform/
+├── oip/            29 production modules — the platform itself
+├── tests/          37 test files, property-based (N-4)
+├── benchmarks/     Performance baseline and harness
+├── validation/     Verifiers, probes, mutation suites, per-task logs
+├── Makefile        test · cov · stress · bench · all
+├── pytest.ini      pythonpath=. · testpaths=tests · addopts=-m "not stress"
+└── .coveragerc     source=oip · branch=True · fail_under=95
 ```
 
 ---
 
-## Probes — where the real defects came from
+## Running
 
-Probes run **before** tests are written. Their job is to find what the
-specification permits that the code assumes away.
+```bash
+pip install hypothesis pytest-cov   # NOT persisted across sessions
 
-| Probe | Found |
-|---|---|
-| `probe_t01_8_1_final.py` | **The cascade BFS ordering defect** — 4 of 9 probes failed |
-| `probe_t01_8_1_legal_skew.py` | Proved it reachable with **legal objects** |
-| `probe_t01_8_1_production_api.py` | Proved it reachable through **`store.write_validation()`** |
-| `probe_t01_8_1_reachability.py` | Tested whether type layering made it unreachable |
-| `probe_t01_2_5_*.py` | Archival impossible — **31/39 probes failed** |
-| `probe_t01_6_*.py` | Bounded-phase starvation, bare-string id splitting |
+python -m pytest -q                 # 3,201 tests, ~30s
+python -m pytest -q -m stress       # 128 tests, ~17 min
+python -m pytest -q --cov=oip       # ~60s
+python benchmarks/bench_identity.py # best-of-3 on an idle host
+```
 
-> The three-stage reachability argument for the cascade defect is the model to
-> follow: *reproduce it* → *prove it uses only legal objects* → *prove it
-> survives the typed production API.* A defect that fails any stage is a test
-> artefact, not a defect.
+Or: `make test` · `make cov` · `make stress` · `make bench` · `make all`
 
 ---
 
-## Mutation Suites
+## The 29 Modules
 
-Every new rule is broken deliberately; the suite must fail. Sources are
-restored **byte-identically** and verified with `diff -q`.
+### Foundation
+| Module | Task | Purpose |
+|---|---|---|
+| `enums.py` | T01.1.2 | Closed vocabularies — 9 types, 7 states, 10 relationships, 5 bands |
+| `identity.py` | T01.1.1 | Identity allocation, version monotonicity, branching prevention |
+| `contract.py` | T01.1.2 | The 17 universal required attributes |
+| `lineage.py` | T01.3.2 | Objects-authoritative lineage (N-6) |
+| `relationships.py` | T01.3.1 | Closed ten-type taxonomy (R-6) |
 
-| Suite | Result |
-|---|---|
-| `mutate_t02_1_1.py` | **21/21 killed, 0 survivors** |
-| `mutate_t01_2_4_r1.py` | 19/20 killed; survivor **proven equivalent** |
-| `mutate_t01_6_2/3/4/5.py`, `mutate_t01_2_5.py`, `mutate_t01_5_5.py` | All rules covered |
+### Store and Graph
+| Module | Task | Purpose |
+|---|---|---|
+| `store.py` | T01.1.4 | Knowledge Store — atomic writes, typed paths. **Sole broad integration point** |
+| `graph.py` | T01.3.3–3.6 | Derived, rebuildable index; bidirectional traversal |
+| `configuration.py` | T01.1.6–1.7 | Configuration + failure stores, CI-1 isolated |
+| `retention.py` | T01.2.5 | ARCHIVED tiering by reachability (N-12) |
 
-Two harness bugs were caught by mutation testing itself:
+### Acceptance and Integrity
+| Module | Task | Purpose |
+|---|---|---|
+| `acceptance.py` | T01.4.1–4.4 | V1–V12 at the `PROPOSED → ACTIVE` gate |
+| `integrity.py` | T01.4.5 | I1–I8 as continuous invariants |
+| `semantic.py` | T01.4.6 | Semantic verification hook (S-5 Layer 1) |
+| `lifecycle.py` | T01.2.1 | Seven states, per-type reachability |
+| `cascade.py` | T01.2.3/2.4 | Cascade invalidation + partial retraction |
 
-1. **An anchor with wrong indentation** silently skipped a mutation (reported
-   `inapplicable`, not `killed`).
-2. **A mutant that produced a non-terminating program** — the suite hung rather
-   than failing, so "killed" could never be observed. Replaced with a
-   terminating mutant and a per-mutant timeout.
+### Confidence
+| Module | Task | Purpose |
+|---|---|---|
+| `support.py` | T01.5.2 | Evidential support (S-2's five inputs) |
+| `calibration.py` | T01.5.5 | Five-band rubric (S-1) |
+| `claim.py` | T01.7.2 | Canonical claims (R-5) |
 
-> A surviving mutant means the tests do not protect the rule. An *equivalent*
-> mutant must be **proven** equivalent, not assumed.
+### Orchestration
+| Module | Task | Purpose |
+|---|---|---|
+| `orchestration.py` | T01.6.1–6.5 | Batch cycles, sequencing, failure surfacing, concurrency boundary |
+
+### Object Types
+`evidence.py` · `fact.py` · `problem.py` · `pattern.py` · `opportunity.py` ·
+`solution.py` · `validation.py` · `execution.py` · `feedback.py` — one per
+Intelligence Object type, each with its per-type rules.
+
+### Phase 2
+| Module | Task | Purpose |
+|---|---|---|
+| `source.py` | T02.1.1 | Source registry, versioned trust, independence grouping |
+
+> **`source.py` is the only Phase-2 module.** It was written *before* N-20 was
+> ratified, so its `SourceType` enum is **deliberately empty** and every
+> taxonomy operation fails closed citing M-16. Now that N-20 §5.1 supplies the
+> eight members, the enum may be populated — **only** from that record.
 
 ---
 
-## Key Reports
+## Architectural Constraints Enforced in Code
 
-| File | Finding |
+| Constraint | Where |
 |---|---|
-| `PHASE-1-CLOSURE-REPORT.md` | Phase 1 closed — full metrics |
-| `T01.8.1-DEFECT-cascade-bfs-ordering.md` | The defect that survived two gates and 3,136 tests |
-| `T02.1.1-ARCHITECTURE-CHALLENGE.md` | 7 attacks on the M-16 blocker; all failed |
-| `T02.1.1-DERIVABILITY-INVESTIGATION.md` | Formal proof: ≥3 valid taxonomies satisfy every ratified constraint |
+| Module dependency graph is a **DAG** | Verified by `closure_t01_8_1.py` |
+| `store` is the **sole** broad integrator (≥15 imports) | All others ≤6 |
+| `calibration` imports only `enums` | CI-1 boundary |
+| `retention` imports only `enums` + `graph` | CI-1 boundary |
+| `source` imports only `contract` | CI-1 boundary |
+| No module claims to close a marker | Playbook F3 |
+| Every module cites `Task:` and `Architecture References:` | Convention |
 
 ---
 
-## The Method
+## Test Discipline (N-4)
 
-Established across Phase 1, refined by what each step caught:
+**Outputs are not guaranteed deterministic.** Tests assert *properties*, never
+equality on engine output (Playbook **F11**).
 
-1. **Extract, never recall.** Write the specification from the ratified sources
-   first, with line references.
-2. **Probe adversarially** before writing a single test.
-3. **Write property-based tests** — never equality on outputs (F11).
-4. **Mutate** every new rule; restore byte-identically.
-5. **Verify mechanically** — and treat a verifier failure as equally likely to
-   be a bug in the *verifier*.
-
-> **On step 5:** during the Phase-2 work, **10 of 10** initial verifier
-> failures were checker errors, not code defects — invented API names, and two
-> regexes that matched *prose documenting a marker as open* and so asserted the
-> opposite of their intent. Had those been trusted, working production code
-> would have been "fixed".
+- Property-based via `hypothesis`
+- Mutation-tested: every new rule broken deliberately, suite must fail
+- Sources restored **byte-identically** after mutation (`diff -q` verified)
+- Stress-tested at volume and under thread contention
 
 ---
 
-## Reading the Logs
+## Known Environment Traps
 
-`*.log` files are retained runs, not summaries. They record what actually
-happened, including failures. Notable:
+| Trap | Symptom | Action |
+|---|---|---|
+| Packages not persisted | ~32 `ModuleNotFoundError: hypothesis` collection errors | Reinstall — not a regression |
+| Two-core shared host | Wild benchmark variance | Best-of-3 on idle box; **prove** contention via `ps aux` |
+| Killing a mutation run | Phantom "hangs", corrupted benchmarks | Never `kill -9`; verify `diff -q` afterwards |
+| Stress suite ~17 min | Harness timeouts on long commands | Split into batches, log to `validation/*.log` |
 
-| Log | Contents |
-|---|---|
-| `T01.8.1-exit-gate.log`, `*-rerun.log` | The first two gate runs — **both halted on defects** |
-| `T01.8.1-final-full.log`, `*-final-stress.log` | The passing run: 3,136 + 116 |
-| `CLOSURE-mutation.log`, `CLOSURE-stress.log` | Final closure evidence |
-| `T01.8.1-R2-mutation.log` | Mutation after the cascade repair |
+---
+
+## A Note on the `decisions/` Symlinks
+
+`tests/test_calibration.py` verifies the calibration rubric **verbatim against
+`S-01-calibration-rubric.md`** — a genuine specification-to-code cross-check.
+
+It resolves the record at `<repo>/decisions/<ID>.md`. Because this repository
+groups records under `decisions/records/`, the historical paths are preserved
+by symlinks rather than by editing a frozen Phase-1 test.
+
+This was caught by running the suite in the copied tree: **1 failure that did
+not exist in the original.** Worth stating plainly — the repository
+reorganisation broke a real check, and the check did its job.
