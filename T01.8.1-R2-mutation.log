@@ -1,0 +1,26 @@
+baseline (unmutated) ... pass
+  killed    M1 partial retraction removed entirely (invalidate everything)
+  killed    M2 partial retraction always applies (invalidate nothing)
+  killed    M3 predicate always reports retention
+  killed    M4 predicate never reports retention
+  killed    M5 doomed set ignored: a condemned upstream still attests
+  killed    M6 doomed set not seeded with the origin
+  killed    M7 doomed set never extended as dependents are condemned
+  killed    M8 SUPERSEDED wrongly treated as withdrawal
+  killed    M9 an unresolvable upstream wrongly counted as attesting
+  killed    M10 a reference-less object wrongly counted as retaining
+  killed    M11 a lineage-less object wrongly counted as retaining
+  killed    M12 spared objects not reported
+  killed    M13 partial_count always zero
+  killed    M17 fixpoint collapsed to a single pass (the T01.8.1 defect)
+  killed    M18 fixpoint never re-iterates (progress never signalled)
+  SURVIVED  M19 settled objects skipped by identity rather than membership
+  killed    M20 eligibility emitted for every undecided object
+  killed    M14 I6 flags partial retraction as a cascade miss
+  killed    M15 I6 stops detecting a genuine uncascaded miss
+  killed    M16 I6 ignores reference-less objects check inverted
+
+killed 19/20; survivors 1; inapplicable 0
+sources restored byte-identical: True
+  SURVIVOR: M19 settled objects skipped by identity rather than membership
+EXIT=1

@@ -1,0 +1,54 @@
+T01.6.2 VALIDATION LOG -- Processing-State Tracking
+Recorded: 2026-08-03
+
+=== FULL SUITE ===
+.................                                                        [100%]
+2465 passed, 78 deselected in 23.63s
+
+=== ARCHITECTURE VERIFICATION ===
+
+43/43 checks passed
+
+=== ADVERSARIAL PROBES ===
+all probes passed
+all round-2 probes passed
+all round-3 probes passed
+
+=== COVERAGE ===
+oip/orchestration.py   458 stmts   1 miss   120 branch   0 partial   99.8%
+  (the single miss is line 459, the pre-existing EngineInvoker Protocol
+   ellipsis from T01.6.1 -- not code introduced by this task)
+TOTAL 5882 stmts, 98.94%  (was 98.88% before this task)
+Every module remains >= 95%. Lowest: integrity.py 95.9% (unchanged).
+
+=== MUTATION TESTING ===
+25 mutations of T01.6.2 rules; 25 killed, 0 survivors, 0 inapplicable.
+Source restored byte-identical, verified with `diff -q`.
+
+=== STRESS ===
+78 passed (72 pre-existing + 6 new TestProcessingStateStress), 0 failed.
+Runtime 1174s.
+
+=== BENCHMARKS (best-of-4, 2-core shared host) ===
+run 1  REGRESSION flagged: depth-drift +27.9%
+run 2  PASS
+run 3  PASS
+run 4  REGRESSION flagged: validate_succession -32.1%
+Runs 2 and 3 pass cleanly. Runs 1 and 4 flagged DIFFERENT metrics, which is
+the signature of host noise rather than a regression: a real regression is
+consistent across runs. Verified mechanically that benchmarks/bench_identity.py
+imports only oip.identity and never loads oip.orchestration -- this task's code
+is not on any benchmarked path. Baseline NOT re-recorded.
+
+=== DEFECT FOUND AND FIXED ===
+Bare-string id collections were accepted and iterated character-wise.
+`input_ids="abc"` was stored as three ids "a","b","c", so the recorded key and
+the queried key disagreed and a genuine repeat read as new work -- defeating
+AC1 outright. Same root cause in WorkItem.input_ids and
+InvocationResult.produced_ids (T01.6.1). Fixed at all three sites via
+_id_tuple(); lists are coerced to tuples, bare strings refused. Regression
+tests in TestBareStringIsNotSplit; mutation M7 confirms the guard is bound.
+
+Second, smaller: mixed timezone-aware/naive timestamps raised an uncaught
+TypeError from the store (the V8 / E-V5 / X-V5 defect family). Now refused
+explicitly by _require_coherent_timestamps(). Mutations M8, M9 confirm.

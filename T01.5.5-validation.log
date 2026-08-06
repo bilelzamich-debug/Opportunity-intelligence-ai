@@ -1,0 +1,99 @@
+T01.5.5 VALIDATION LOG -- Calibration Rubric Conformance
+Recorded: 2026-08-03
+
+=== FULL SUITE ===
+3086 passed, 112 deselected. 0 failed.
+(baseline before this task: 2929 passed -> +157 new tests)
+
+=== ARCHITECTURE VERIFICATION ===
+93/93 mechanical checks passed (validation/verify_t01_5_5.py)
+Includes every S-1 band range matched against the decision record's own
+printed table, all five criteria and all ten anchors matched verbatim against
+S-1's text, and the countable/qualitative split verified against S-1's five
+literal test strings.
+
+All prior verifiers re-run: 43/43, 52/52, 64/64, 76/76, 77/77 -- 405 checks
+total, all passing. No prior verifier required adjustment.
+
+=== ADVERSARIAL PROBES ===
+round 1: 47 probes -- all passed
+round 2: 34 probes -- all passed (1 latent defect found and fixed)
+Total 81 probes across 2 rounds.
+
+=== COVERAGE ===
+oip/calibration.py   202 stmts   0 miss   46 branch   0 partial   100.0%
+TOTAL 6678 stmts, 99.02%  (was 98.99% before this task)
+Every module remains >= 95%.
+
+=== MUTATION TESTING ===
+33 mutations across calibration.py and enums.py.
+33 killed, 0 survivors, 0 inapplicable. Sources restored byte-identical.
+
+Every S-1 rule is proven load-bearing: each band range, each countable-test
+attribution, the refusal to invent counts for the two qualitative bands, every
+false-conformity path, the append-only register, the governed-component
+restriction, and the cross-engine qualification.
+
+=== STRESS ===
+112 passed (105 pre-existing + 7 new TestCalibrationStress), 0 failed.
+Runtime 1074s. Includes 100,000 assessments exact, band resolution verified
+unique and exhaustive over 100,001 points, no false conformity across the whole
+scale, 48,000 concurrent recordings, and determinism over 20,000 repeats.
+
+=== BENCHMARKS (best-of-3, 2-core shared host) ===
+run 1 PASS   run 2 PASS   run 3 PASS
+No metric regressed on any run; no host noise arose, so none needed proving.
+Baseline NOT re-recorded. Assessment costs <100us each at 50,000 iterations.
+
+=== DEFECT FOUND AND FIXED ===
+
+BandCriterion.contains() ANSWERED FALSE FOR VALUES GENUINELY IN THE BAND.
+S-1 prints its ranges at two decimal places (0.00-0.19, 0.20-0.39, ...), which
+leaves unprinted gaps: 0.195 is in no printed range, yet it is plainly
+NEGLIGIBLE. contains() tested against the printed literals, so it returned
+False for 0.195, 0.395, 0.599 and 0.799 -- a trap for any caller that used it
+to route an assertion to a criterion.
+
+Assessment itself was never wrong: assess_assertion() resolves the band through
+ConfidenceBand.for_value() (T01.5.1), which is authoritative. But a public
+predicate that disagrees with the authoritative boundary is latent
+miscalibration of exactly the kind S-1 exists to prevent.
+
+Fixed by making contains() delegate to the authoritative band while retaining
+low/high as the S-1 text for display. The two are verified to agree at every
+printed gridpoint by an import-time guard, and mutation M29 confirms the
+delegation is load-bearing.
+
+=== SPECIFICATION NOTES ===
+No document conflicts found. S-1, R-3, N-3, B-05, IOM 2.3 and the backlog agree
+on every binding point. S-1's printed ranges match the already-implemented
+ConfidenceBand boundaries exactly (verified before any code was written).
+
+SPECIFICATION GAP SURFACED, NOT FILLED.
+S-1 gives each band a test ("Are there >=2 equally good alternative
+conclusions?") but the object model has NO ATTRIBUTE in which an engine records
+its answer. Adding one would change the object model, which this task may not
+do. The conformance layer therefore accepts a declared alternative count as an
+OPTIONAL input and reports UNASSESSED when it is absent -- never CONFORMANT.
+The absence of a ratified field is a real gap and is recorded here rather than
+papered over.
+
+DELIBERATELY NOT IMPLEMENTED:
+  - Any alternative-counting algorithm. S-1 makes counting OBSERVABLE, not
+    COMPUTABLE: it requires judging which readings of the inputs are credible,
+    which is engine judgement over object content. Computing it would fabricate
+    the rubric.
+  - Any statistical or empirical calibration. That is N-3's measure O2, which
+    needs realised outcomes that do not exist before P8, and is scheduled at
+    T08.3.5. B-05 is explicit that the rubric governs now and empiricism
+    corrects later.
+  - Counts for NEGLIGIBLE and STRONG. S-1 defines those two bands
+    qualitatively (reviewer disagreement; assumption-dependence), so a
+    count-based check against them returns UNASSESSED. Attributing a number
+    would invent a threshold nobody ratified and would manufacture deviations.
+  - Any acceptance-rule change. No ratified source makes calibration a
+    validation rule; V1-V12 do not include it. AC2 says deviations are
+    RECORDED, and recording is all that happens. The rule count is still 68.
+  - Any change to evidential_support or effective_confidence. S-1's own Known
+    Tensions restrict the rubric to assertion_confidence (M-59 governs the
+    other).

@@ -1,0 +1,97 @@
+T01.6.5 VALIDATION LOG -- Sequencing Enforcement
+Recorded: 2026-08-03
+
+=== FULL SUITE ===
+2823 passed, 99 deselected. 0 failed.
+(baseline before this task: 2694 passed -> +129 new tests)
+
+=== ARCHITECTURE VERIFICATION ===
+76/76 mechanical checks passed (validation/verify_t01_6_5.py)
+Includes v2 4.12's stage-ordering responsibility and Store-read grant, v2 5.5's
+"Read state only" row, and N-14's direct-input table extracted row by row from
+the decision record, plus empirical confirmation of both acceptance criteria.
+
+Prior verifiers re-run: 43/43, 52/52, 64/64 -- 235 checks total, all passing.
+Three assertions in the T01.6.2/6.3/6.4 verifiers were stale snapshots ("exactly
+4 outcome members", "max_workers appended last") rather than regressions; each
+was rewritten to assert the invariant it actually defends. No production code
+was changed to satisfy them.
+
+=== ADVERSARIAL PROBES ===
+round 1: 51 probes -- all passed (1 real defect found: resolver fault)
+round 2: 24 probes -- all passed (2 probe errors corrected, not code defects)
+round 3: 17 probes -- all passed
+Total 92 probes across 3 rounds.
+T01.6.2, T01.6.3 and T01.6.4 probe suites re-run: all still green.
+
+=== COVERAGE ===
+oip/orchestration.py   858 stmts   2 miss   230 branch   0 partial   99.8%
+  (both misses are Protocol ellipses -- EngineInvoker from T01.6.1 and
+   StateResolver from this task; neither is executable code)
+oip/enums.py            80 stmts   0 miss                           100.0%
+TOTAL 6320 stmts, 99.00%  (was 98.99% before this task)
+Every module remains >= 95%. Lowest: integrity.py 95.9% (unchanged).
+
+=== MUTATION TESTING ===
+26 mutations across orchestration.py and enums.py.
+26 killed, 0 survivors, 0 inapplicable. Sources restored byte-identical.
+
+M8 ("satisfied ignores existence") survived the first pass and was a genuine
+TEST gap, not an equivalent mutant: an InputCheck can report a matching type
+while exists is False -- an inconsistent resolver, or state that changed between
+reads. The `exists` conjunct is load-bearing. Now killed by a direct test.
+
+M26 confirms the guard does NOT police work-set order: a mutant that added
+order-checking is detected and rejected, proving OQ-11 is not closed here.
+
+=== STRESS ===
+99 passed (93 pre-existing + 6 new TestSequencingStress), 0 failed.
+Runtime 980s. Includes 50,000 mixed-readiness items exact; the N-11 barrier
+verified across 1,500 randomised cycles with sequencing active; 20,000 unready
+items with zero engine invocations; and rejection verdicts proven deterministic
+across repeated runs at volume.
+
+=== BENCHMARKS (best-of-3, 2-core shared host) ===
+run 1 PASS   run 2 PASS   run 3 PASS
+No metric regressed beyond threshold on any run. Baseline NOT re-recorded.
+
+=== DEFECT FOUND AND FIXED ===
+
+A RAISING STATE RESOLVER DESTROYED THE ENTIRE CYCLE.
+The readiness check called resolve_type unguarded, so a resolver fault
+propagated out of _invoke, out of _execute and out of run_cycle: the whole
+cycle record was discarded, work that had already run became invisible, and
+remaining work was never attempted. Identical in shape to the failure-store
+defect fixed at T01.6.3, and forbidden for the same reason -- a fault in the
+readiness check must never be the reason a cycle disappears.
+
+Fixed by guarding the check and FAILING CLOSED: if readiness cannot be
+determined, the engine does not run. v2 4.12's stage-order violation is what
+happens when an engine runs on inputs that are not ready, and an unanswerable
+check cannot establish that they are. The item is rejected with the reason
+stated, the cycle continues, and the fault is not misattributed to an engine.
+KeyboardInterrupt and SystemExit still propagate.
+
+=== SPECIFICATION NOTES ===
+No document conflicts found. v2 4.12, 4.13, 5.5, IOM 2.5/2.6, N-14, N-17, N-18
+and N-6 agree on every binding point.
+
+One APPARENT tension, resolved without inventing anything: N-17 says
+Orchestration is "directive, not reactive" and "does not react to object
+availability". That governs what work is PLANNED -- the caller plans. This task
+REJECTS invalid work, which is v2 4.12's explicit "enforce stage ordering"
+responsibility. Validating a given plan's inputs is not selecting work. N-17
+itself binds T01.6.5, which confirms the two are complementary.
+
+TWO OPEN QUESTIONS DELIBERATELY NOT CLOSED:
+  OQ-10 (stage skipping)  -- open, scheduled P6. Partial and stage-skipping
+                             work sets are NOT rejected.
+  OQ-11 (backflow)        -- open, scheduled T07.3.8. Reverse-ordered and
+                             arbitrarily ordered work sets are NOT rejected.
+Enforcing either would close an open question by implementation, phases early.
+Both are asserted as non-behaviour by test and by mutation M26.
+
+Ambiguity A1 (must inputs be ACTIVE, or merely exist?) was failed closed to the
+criterion's literal word: existence is enforced, status is REPORTED via
+input_statuses so a caller may apply its own rule. No ratified source states a
+status precondition for invocation.

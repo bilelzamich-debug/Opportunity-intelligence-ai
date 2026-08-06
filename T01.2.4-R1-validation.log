@@ -1,0 +1,104 @@
+T01.2.4-R1 VALIDATION LOG -- Partial Retraction Completion
+Recorded: 2026-08-04
+
+=== FULL SUITE ===
+3136 passed, 116 deselected. 0 failed.
+(entering this task: 3071 passed / 16 failed -> +65 net new tests, 0 failures)
+
+=== RATIFIED BASIS ===
+N-9 "What It Binds": "T01.2.4 partial retraction: an object retaining at least
+one valid upstream reference is re-versioned, not invalidated."
+N-9 "Consequences Accepted": "A dependent supported by ten Facts, one of which
+is invalidated, is handled by the partial-retraction rule rather than by
+cascade -- the boundary between the two must be maintained carefully."
+IOM 3.2: ACTIVE -> INVALIDATED on "All attesting Evidence retracted"; partial
+retraction "produces a new version with reduced support, not invalidation.
+The Fact remains attested."
+
+Nothing beyond these was implemented. No threshold, vocabulary or behaviour
+was invented.
+
+=== SCOPE BOUNDARY OBSERVED ===
+N-9 also states cascade performs NO interpretation and alters "status only,
+never content". Cascade therefore does NOT create the reduced-support version:
+producing a new version is the owning engine's act. Cascade applies the
+boundary structurally -- it spares the object and REPORTS it via
+CascadeResult.partially_retracted -- which is precisely "handled by the
+partial-retraction rule rather than by cascade".
+
+=== TESTS UPDATED (16 across 8 suites) ===
+Every one asserted that a multi-parent dependent is INVALIDATED when only ONE
+parent is withdrawn. Each was verified to be a genuine partial-retention case
+before being touched. Only the contradicting assertion/arrangement changed;
+each test's actual intent ("cascade reaches this type") was preserved and
+strengthened to the IOM 3.2 trigger by withdrawing ALL attesting upstream.
+
+  test_fact.py        1   (split into partial + total cases)
+  test_problem.py     4
+  test_pattern.py     3
+  test_opportunity.py 1
+  test_solution.py    3
+  test_validation.py  2
+  test_execution.py   2
+  test_feedback.py    1
+  test_stress.py      7   (cascade_reaches_* at volume)
+
+No assertion was deleted without replacement; the total-withdrawal path is now
+asserted everywhere the partial path previously was.
+
+=== TESTS ADDED ===
+tests/test_partial_retraction.py -- 48 tests, covering exactly the required
+properties:
+  AC1 remains ACTIVE when >=1 upstream valid   (1-of-2, 1-of-10, 9-of-10)
+  AC2 invalidates only when ALL withdrawn      (2-of-2, 10-of-10)
+  AC3 type-agnostic                            (6 derived types, both directions)
+  mixed parents   (RETRACTED/INVALIDATED/SUPERSEDED, diamonds, shared roots)
+  rollback safety (eligibility precedes mutation; integrity holds)
+  idempotence     (repeat partial and total cascades; stable spared set)
+  concurrency     (15 concurrent partial cascades; concurrent total withdrawal)
+  6 property-based tests over every partition of parents
+  defensive-branch coverage for the retention predicate
+
+tests/test_stress.py -- 4 new TestPartialRetractionStress tests:
+  200-parent fan-in spared until the last parent
+  invariant across 300 subjects; 200-subject idempotence; 80-way concurrency
+
+=== SECOND DEFECT FOUND AND FIXED DURING THIS TASK ===
+I6's detective check (oip/integrity.py) flagged ANY dependent with a withdrawn
+upstream as "cascade did not reach it". Under the ratified boundary that
+reports correct partial retraction as an integrity breach -- 15 violations on
+a legitimately spared population.
+
+Fixed: I6 now reports a miss only when EVERY upstream reference is withdrawn
+and the object is still ACTIVE. Verified both directions:
+  all upstream withdrawn, no cascade -> 1 violation (still detected)
+  partial withdrawal                 -> 0 violations (correctly permitted)
+Mutations M14/M15 confirm both directions are load-bearing.
+
+=== COVERAGE ===
+oip/cascade.py    164 stmts   0 miss   58 branch   1 partial   99.5%
+oip/integrity.py  166 stmts   6 miss                            96.0%
+TOTAL 6708 stmts, 99.02%. Every module remains >= 95%.
+
+=== MUTATION TESTING ===
+16 mutations across cascade.py and integrity.py.
+16 killed, 0 survivors, 0 inapplicable. Sources restored byte-identical.
+Proven load-bearing: the boundary itself, the predicate in both directions,
+the doomed set (all three aspects), the withdrawal vocabulary (SUPERSEDED is
+not withdrawal), unresolvable/absent references, the spared-set reporting, and
+both directions of the I6 detective check.
+
+=== STRESS ===
+116 passed (112 pre-existing + 4 new), 0 failed. Runtime 1021s.
+
+=== BENCHMARKS (best-of-6, 2-core shared host) ===
+run 1 REGRESSION (validate_succession -50.3%)  runs 2-6 PASS.
+Host noise PROVEN, not assumed: benchmarks/bench_identity.py loads only
+oip.identity -- verified at runtime that neither oip.cascade nor oip.integrity
+is imported on any benchmarked path, so this task's code cannot affect it.
+5 of 6 runs clean. Baseline NOT re-recorded.
+
+=== ARCHITECTURE VERIFIERS RE-RUN ===
+verify_t01_6_2 43/43, verify_t01_6_3 52/52, verify_t01_6_4 64/64,
+verify_t01_6_5 76/76, verify_t01_2_5 77/77, verify_t01_5_5 93/93.
+405 checks total, all passing. No prior task regressed.

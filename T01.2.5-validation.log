@@ -1,0 +1,107 @@
+T01.2.5 VALIDATION LOG -- ARCHIVED Tiering / Reachability Guard
+Recorded: 2026-08-03
+
+=== FULL SUITE ===
+2929 passed, 105 deselected. 0 failed.
+(baseline before this task: 2823 passed -> +106 new tests)
+
+=== ARCHITECTURE VERIFICATION ===
+77/77 mechanical checks passed (validation/verify_t01_2_5.py)
+Includes N-12's reachability rule extracted verbatim from the decision record,
+the marker-crosswalk row proving IOM MISSING-31 = canonical M-38 (closed by
+N-12), an exhaustive regex proving the IOM contains NO ARCHIVED transition row
+other than ACTIVE -> ARCHIVED, and empirical confirmation of all three
+acceptance criteria.
+
+All prior verifiers re-run: 43/43, 52/52, 64/64, 76/76 -- 312 checks total,
+all passing. No prior verifier required adjustment.
+
+=== ADVERSARIAL PROBES ===
+round 1: 39 probes -- all passed (1 real defect found: see below)
+round 2: 24 probes -- all passed (2 probe artefacts corrected, not code defects)
+Total 63 probes across 2 rounds.
+
+=== COVERAGE ===
+oip/retention.py   145 stmts   4 miss   52 branch   2 partial   97.0%
+  (misses are two Protocol ellipses and two trivial early returns)
+oip/store.py       429 stmts   4 miss                          98.5%
+  (the new guard is fully covered, including its N-6 graph-lag branch)
+oip/lifecycle.py                                              100.0%
+TOTAL 6476 stmts, 98.99%. Every module remains >= 95%.
+
+=== MUTATION TESTING ===
+28 mutations across retention.py, store.py, lifecycle.py and cascade.py.
+26 killed, 2 survivors, 0 inapplicable. Sources restored byte-identical.
+
+Five survived the first pass. Three were genuine TEST gaps and are now killed:
+  M4  guard checking parents() instead of ancestors() -- needed a case where
+      the intermediate is withdrawn so only a transitive path remains
+  M15 index omitting ancestors -- needed an ancestor that is not itself ACTIVE
+  M18 REJECTED -> ARCHIVED -- needed a direct per-terminal-state assertion
+
+Two remain and are PROVABLY EQUIVALENT MUTANTS (M5, M9): removing the
+`active_id == object_id` self-skip changes nothing observable, because the
+lineage graph is acyclic under R-8 and `ancestors(x)` can therefore never
+contain `x`. Demonstrated by TestSelfExclusionIsDefensive rather than asserted.
+Both skips are retained because they state the intent: an object's own ACTIVE
+status is the precondition for archiving, never a protection.
+
+=== STRESS ===
+105 passed (99 pre-existing + 6 new TestRetentionStress), 0 failed.
+Runtime 1052s. Includes 2,000 objects with exact protection, traversal proven
+intact after mass archival of 1,000 pairs, nothing hard-deleted at volume,
+150 deep chains with every ancestor protected, and the invariant "no archived
+object supports ACTIVE knowledge" verified after concurrent archival.
+
+=== BENCHMARKS (best-of-5, 2-core shared host) ===
+run 1 PASS  run 2 REGRESSION (depth drift +21.7%)  run 3 PASS  run 4 PASS  run 5 PASS
+4 of 5 clean. The flagged run hit the depth-drift metric already documented as
+this host's noisiest (it flagged once and recovered at T01.6.2 and T01.6.4 too).
+Verified mechanically that benchmarks/bench_identity.py loads only oip.identity
+and never imports oip.retention or oip.store. Baseline NOT re-recorded.
+
+=== DEFECT FOUND AND FIXED ===
+
+MY OWN FIRST DESIGN MADE ARCHIVAL IMPOSSIBLE.
+The initial assess() treated "the object is itself in the ACTIVE set" as
+protection (REASON_IS_ACTIVE_ROOT). Because IOM 2.1 permits ARCHIVED only from
+ACTIVE, protecting every ACTIVE object protects everything: 31 of 39 round-1
+probes failed, and no object could ever be archived. N-12 protects what
+SUPPORTS current knowledge -- objects reachable from ANOTHER ACTIVE object --
+not the candidate's own status, which is the precondition for archiving.
+Fixed by _supports_other_active(), which excludes the candidate from the scan.
+Bound by test_the_candidates_own_active_status_does_not_protect_it.
+
+PRE-EXISTING GAP CLOSED (the task's purpose).
+store.transition() permitted archiving any object, including one an ACTIVE
+object derives from -- the hole recorded in the P1 technical debt as
+"reachability guard has no mechanism". Now guarded at the sole mutation point.
+
+TWO EXISTING TESTS CORRECTED, NOT WEAKENED.
+test_archived_does_not_cascade and test_pti1_detects_membership_falling_below_two
+both archived an object that ACTIVE knowledge still derived from -- legal only
+because of the defect. Each was rewritten to reach the same state by a ratified
+route (withdraw the dependent first / use RETRACTED), leaving both subjects --
+what cascades, and PT-I1 membership -- unchanged.
+
+=== SPECIFICATION NOTES ===
+One apparent conflict, resolved by extraction rather than judgement. IOM 2.1
+marks the ARCHIVED authority "Undefined (MISSING-31)", which would make this
+task unimplementable. marker-crosswalk.md line 45 maps IOM MISSING-31 to
+canonical M-38 ("Retention policy") and warns that canonical M-31 is a
+different gap. M-38 is CLOSED by N-12, which supplies both trigger and owner.
+Canonical M-31 (gate ownership) remains OPEN and is untouched.
+
+A second, resolved the same way: N-12's Known Tension says REJECTED objects are
+"subject to tiering like any other unreachable object", while R-2/IOM forbid
+transitioning a terminal state. Compatible once CONTENT tiering is distinguished
+from the ARCHIVED status transition. Only the ratified transition is implemented.
+
+UNSPECIFIED AND DELIBERATELY NOT INVENTED:
+  - The physical content-tiering step. N-12 says content becomes "retrievable
+    through a slower path" but defines no tier, eviction or retrieval path.
+    NO CONTENT IS EVICTED; reported by content_tiering_specified = False.
+  - When tiering runs. "A maintenance operation" with no schedule or owner.
+    Caller-invoked only; no scheduler, no GC, no age heuristic (N-12 rejected
+    Option B), no hard deletion (I4, N-12 rejected Option E).
+  - Retention of failure records and configuration: N-12 excludes them.

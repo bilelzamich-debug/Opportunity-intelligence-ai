@@ -1,0 +1,176 @@
+T01.7.3 VALIDATION LOG (run 2, per-test granularity)  started 2026-08-02 20:19:57Z
+python 3.13.14 | hypothesis 6.165.0 | pytest 9.0.3 | pytest-cov present
+  c3bb7ce55f1b2992d920ba251aeb3f90  oip/problem.py
+  be5fb8ab36c537037949bbafc6a8f316  tests/test_problem.py
+  87e413b970fea7468cdd331b66ef4128  oip/store.py
+  07346b55bcb90fad4d562cdc66e0e155  oip/acceptance.py
+=== STEP 1a: test_problem_resting_on_one_thousand_facts ===
+.                                                                        [100%]
+1 passed in 2.38s
+exit=0
+=== STEP 1b: test_ten_thousand_problems_stay_consistent ===
+.                                                                        [100%]
+1 passed in 174.32s (0:02:54)
+exit=0
+=== STEP 1c: test_problem_integrity_audit_at_volume ===
+.                                                                        [100%]
+1 passed in 5.93s
+exit=0
+=== STEP 1d: test_solution_detection_stays_flat_on_long_statements ===
+.                                                                        [100%]
+1 passed in 2.36s
+exit=0
+=== STEP 1e: test_long_supersession_chain_of_problems ===
+.                                                                        [100%]
+1 passed in 0.48s
+exit=0
+=== STEP 1f: test_cascade_reaches_problems_at_depth ===
+.                                                                        [100%]
+1 passed in 0.42s
+exit=0
+=== STEP 2a: FAST SUITE ===
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 23%]
+........................................................................ [ 28%]
+........................................................................ [ 34%]
+........................................................................ [ 40%]
+........................................................................ [ 46%]
+........................................................................ [ 52%]
+........................................................................ [ 57%]
+........................................................................ [ 63%]
+........................................................................ [ 69%]
+........................................................................ [ 75%]
+........................................................................ [ 81%]
+........................................................................ [ 86%]
+........................................................................ [ 92%]
+........................................................................ [ 98%]
+..................                                                       [100%]
+1242 passed, 30 deselected in 13.53s
+exit=0
+=== STEP 2b: STRESS 1/4 LargeChains ===
+...                                                                      [100%]
+3 passed, 1269 deselected in 16.24s
+exit=0
+=== STEP 2c: STRESS 2/4 ProlongedConcurrency + HighVolume ===
+......                                                                   [100%]
+6 passed, 1266 deselected in 149.76s (0:02:29)
+exit=0
+=== STEP 2d: STRESS 3/4 ContractVolume + CascadeStress + EvidenceStress ===
+...........                                                              [100%]
+11 passed, 1261 deselected in 549.10s (0:09:09)
+exit=0
+=== STEP 2e: STRESS 4/4 FactStress ===
+....                                                                     [100%]
+4 passed, 1268 deselected in 1.56s
+exit=0
+=== STEP 3: COVERAGE ===
+........................................................................ [  5%]
+........................................................................ [ 11%]
+........................................................................ [ 17%]
+........................................................................ [ 23%]
+........................................................................ [ 28%]
+........................................................................ [ 34%]
+........................................................................ [ 40%]
+........................................................................ [ 46%]
+........................................................................ [ 52%]
+........................................................................ [ 57%]
+........................................................................ [ 63%]
+........................................................................ [ 69%]
+........................................................................ [ 75%]
+........................................................................ [ 81%]
+........................................................................ [ 86%]
+........................................................................ [ 92%]
+........................................................................ [ 98%]
+..................                                                       [100%]
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.14-final-0 _______________
+
+Name                   Stmts   Miss Branch BrPart  Cover   Missing
+------------------------------------------------------------------
+oip/acceptance.py        252      2     96      0  99.4%   116, 488
+oip/cascade.py           138      2     44      2  97.8%   231-232, 368->exit
+oip/claim.py             106      2     32      1  97.8%   152-153
+oip/configuration.py     110      4     12      0  96.7%   161-162, 219-220
+oip/contract.py          146      0     50      0 100.0%
+oip/enums.py              75      0     10      0 100.0%
+oip/evidence.py          281      5    106      4  97.7%   241, 245, 336, 349, 466->464, 475
+oip/fact.py              301      6    132      6  97.2%   234, 345, 398, 400, 413, 518->516, 615
+oip/graph.py             200      3     84      6  96.8%   114, 260, 289->288, 305->303, 328->327, 344
+oip/identity.py          104      0     30      2  98.5%   169->171, 198->exit
+oip/integrity.py         162      6     82      4  95.9%   108-111, 268, 273, 287, 415
+oip/lifecycle.py          42      0     10      0 100.0%
+oip/lineage.py           101      2     42      1  97.9%   70, 293
+oip/problem.py           367      0    160      0 100.0%
+oip/relationships.py      84      0     28      0 100.0%
+oip/semantic.py           65      2     16      1  96.3%   60, 99
+oip/store.py             257      4     48      4  96.7%   267->275, 286->288, 463-469, 470->473
+oip/support.py            83      1     22      1  98.1%   58
+------------------------------------------------------------------
+TOTAL                   2874     39   1004     32  98.1%
+Required test coverage of 95.0% reached. Total coverage: 98.12%
+1242 passed, 30 deselected in 28.48s
+exit=0
+=== STEP 4: BENCHMARKS ===
+==============================================================================
+IDENTITY ALLOCATION BASELINE  --  T01.1.1
+python 3.13.14
+==============================================================================
+benchmark                              ops       ops/sec     us/op  detail
+------------------------------------------------------------------------------
+new_object                         200,000       110,474      9.05  
+succeed (linear chain)             200,000       176,622      5.66  
+validate_succession                200,000     8,633,951      0.12  
+assert_not_reused                  200,000     2,231,785      0.45  
+lineage_of (500k populated)        100,000     2,132,431      0.47  table=500,000
+new_object (concurrent)            200,000        55,089     18.15  8 threads
+memory per identity                200,000        13,778     72.58  295 bytes/identity
+succeed (depth stability)          100,000       178,902      5.59  first=5.35us last=5.60us drift=+4.6%
+------------------------------------------------------------------------------
+median throughput: 178,902 ops/sec
+
+==============================================================================
+REGRESSION CHECK vs baseline recorded 2026-08-02
+==============================================================================
+PASS -- no metric regressed beyond 25%
+exit=0
+=== STEP 5: REGRESSION TESTS ===
+============================= test session starts ==============================
+platform linux -- Python 3.13.14, pytest-9.0.3, pluggy-1.6.0 -- /usr/local/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /home/user/platform
+configfile: pytest.ini
+plugins: anyio-4.14.2, hypothesis-6.165.0, cov-7.1.0
+collecting ... collected 199 items / 182 deselected / 17 selected
+
+tests/test_problem.py::TestSolutionIndependence::test_marker_matching_is_word_bounded[The blacklacks module] PASSED [  5%]
+tests/test_problem.py::TestSolutionIndependence::test_marker_matching_is_word_bounded[a lacksadaisical approach] PASSED [ 11%]
+tests/test_problem.py::TestSolutionIndependence::test_marker_matching_is_word_bounded[needsantics] PASSED [ 17%]
+tests/test_problem.py::TestSolutionIndependence::test_marker_matching_is_word_bounded[unavailablest] PASSED [ 23%]
+tests/test_problem.py::TestSolutionIndependence::test_marker_matching_is_word_bounded[xlack ofy] PASSED [ 29%]
+tests/test_problem.py::TestSolutionIndependence::test_absent_statement_fails_rather_than_passes PASSED [ 35%]
+tests/test_problem.py::TestSingleFactRestatement::test_punctuation_variants_are_still_restatements[<lambda>0] PASSED [ 41%]
+tests/test_problem.py::TestSingleFactRestatement::test_punctuation_variants_are_still_restatements[<lambda>1] PASSED [ 47%]
+tests/test_problem.py::TestSingleFactRestatement::test_punctuation_variants_are_still_restatements[<lambda>2] PASSED [ 52%]
+tests/test_problem.py::TestSingleFactRestatement::test_punctuation_variants_are_still_restatements[<lambda>3] PASSED [ 58%]
+tests/test_problem.py::TestSingleFactRestatement::test_a_genuinely_different_statement_is_not_a_restatement PASSED [ 64%]
+tests/test_problem.py::TestProblemIntegrity::test_pi4_detects_shared_grounding PASSED [ 70%]
+tests/test_problem.py::TestProblemIntegrity::test_pi4_accepts_distinct_grounding PASSED [ 76%]
+tests/test_problem.py::TestProblemIntegrity::test_pi4_grounding_bound_needs_a_populated_graph PASSED [ 82%]
+tests/test_problem.py::TestProblemIntegrity::test_pi4_grounding_bound_skipped_without_a_graph PASSED [ 88%]
+tests/test_problem.py::TestProblemIntegrity::test_pi4_grounding_bound_skipped_on_partial_resolution PASSED [ 94%]
+tests/test_problem.py::TestProblemIntegrity::test_pi2_flags_a_superseded_supporting_fact PASSED [100%]
+
+====================== 17 passed, 182 deselected in 0.26s ======================
+exit=0
+=== SUMMARY ===
+completed 2026-08-02 20:37:23Z
+  c3bb7ce55f1b2992d920ba251aeb3f90  oip/problem.py
+  be5fb8ab36c537037949bbafc6a8f316  tests/test_problem.py
+  87e413b970fea7468cdd331b66ef4128  oip/store.py
+  07346b55bcb90fad4d562cdc66e0e155  oip/acceptance.py
+FAILED/ERROR occurrences: 0
+non-zero exits: 0
+steps recorded: 14
