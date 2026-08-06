@@ -1,92 +1,116 @@
-# Decision Records
+# Governance
 
-**41 ratified decisions. One file each — never merged.**
-
-This directory is the authority for every architectural question. It outranks
-the IOM, PKP v2 and the Implementation Backlog (Constitution Article XI).
-
-Register index with status and dates:
-[`../governance/DECISION-REGISTER.md`](../governance/DECISION-REGISTER.md)
+The rules that make the architecture hold. **These outrank the code.**
 
 ---
 
-## Architecture Decisions — 5
+## Files
 
-| ID | Title | Status | Closes |
+| File | What it is |
+|---|---|
+| [`CONSTITUTION.md`](CONSTITUTION.md) | Eleven articles. Highest authority in the project. Amended only by a recorded decision naming the article changed |
+| [`AGENT-PLAYBOOK.md`](AGENT-PLAYBOOK.md) | How work is executed: role, twelve forbidden actions, working method, gates, approval protocol |
+| [`DECISION-TEMPLATE.md`](DECISION-TEMPLATE.md) | The mandatory six-field structure every decision record must satisfy |
+
+---
+
+## The Precedence Order (Constitution Article XI)
+
+Where documents conflict, this order governs:
+
+1. **The Constitution**
+2. **Decision records** (the architecture decision register)
+3. **Ratification annotations**
+4. **Intelligence Object Model**
+5. **PKP v2 Master Reference**
+6. **Implementation Backlog**
+
+> *"A subordinate document that contradicts this Constitution is in error, and
+> the contradiction is resolved in the Constitution's favour without amendment
+> to it."*
+
+This order is not decorative. It has already resolved two live conflicts:
+
+- **S-2 vs IOM §3.1** — the IOM says `evidential_support` "reflects source
+  reliability"; S-2 says trust is not an input. **S-2 governs.**
+- **N-2 vs backlog `T02.2.4` AC2** — the backlog requires a human gate N-2
+  forecloses. **N-2 governs**, so the acceptance criterion is unsatisfiable as
+  written (this is D-1).
+
+---
+
+## The Eleven Articles
+
+| # | Article | Core statement |
+|---|---|---|
+| I–II | Purpose & Explainability | Every decision carries its *why* |
+| III | Evidence First | Conclusions require evidence |
+| **IV** | **Ground Truth** | **No platform-generated artifact may become Evidence** |
+| V | Modularity | Engines exchange only Intelligence Objects |
+| VI | Advisory Scope | The platform holds no budget, no operational authority, no accountability for consequences |
+| VII | Human-in-the-Loop | Three reserved decisions (N-2's G1/G2/G3) |
+| VIII–IX | Traceability | Complete path from external observation to any object |
+| **X** | **Honest Uncertainty** | **Known gaps are recorded with the same standing as favourable findings** |
+| XI | Precedence | The order above |
+
+Article X is why this repository states its limitations prominently rather than
+burying them — and why N-22's out-of-frame register exists at all.
+
+---
+
+## The Twelve Forbidden Actions
+
+| # | Forbidden | # | Forbidden |
 |---|---|---|---|
-| [`AD-01`](AD-01-evidence-first.md) | Evidence-First | `RECONSTRUCTED` | — |
-| [`AD-02`](AD-02-intelligence-contracts.md) | Intelligence Contracts | `RECONSTRUCTED` | — |
-| [`AD-03`](AD-03-feedback-loop.md) | Feedback Loop | `RECONSTRUCTED` | — |
-| [`AD-04`](AD-04-separation-of-concerns.md) | Separation of Concerns | `RECONSTRUCTED` | — |
-| [`AD-05`](AD-05-ground-truth-protection.md) | **Ground Truth Protection** | `RATIFIED` | C-04 (jointly) |
-
-> AD-01…AD-04 were inherited from v1 as **bare titles**. Their alternatives are
-> *reconstructed*, not recovered, and must never be cited as evidence of what
-> was historically debated. That omission is M-50 — the project's founding
-> defect.
-
-## IOM Ratifications — 8
-
-| ID | Title | Closes |
-|---|---|---|
-| [`R-01`](R-01-immutable-versioned-objects.md) | Immutable versioned objects | M-08 |
-| [`R-02`](R-02-object-lifecycle.md) | Seven-state lifecycle | M-45, OQ-04 |
-| [`R-03`](R-03-confidence-model.md) | Two-component confidence | M-15 |
-| [`R-04`](R-04-temporal-validity.md) | Temporal validity | M-46 |
-| [`R-05`](R-05-canonical-claims.md) | Canonical claims | M-11 |
-| [`R-06`](R-06-relationship-taxonomy.md) | Ten-type relationship taxonomy | M-40 |
-| [`R-07`](R-07-feedback-record.md) 🔺 | Feedback Record as ninth object | C-03 |
-| [`R-08`](R-08-behavioural-loop-closure.md) 🔺 | Behavioural loop closure | C-04 |
-
-## Scope, Boundary and Control — 23
-
-| ID | Title | Closes |
-|---|---|---|
-| [`N-01`](N-01-platform-boundary.md) | Platform boundary: advisory | M-03, M-05 |
-| [`N-02`](N-02-human-gates.md) | **Human gates — exactly three** | OQ-02, OQ-05 |
-| [`N-03`](N-03-success-criteria.md) | Success measures | M-04 |
-| [`N-04`](N-04-determinism.md) | Determinism posture | OQ-01 |
-| [`N-05`](N-05-tenancy.md) | Tenancy discriminator | — |
-| [`N-06`](N-06-store-graph-boundary.md) | Store / Graph boundary | C-06, M-39 |
-| [`N-07`](N-07-configuration-referent.md) 🔺 | Configuration referent + CI-1 | M-63 |
-| [`N-08`](N-08-acceptance-authority.md) | Acceptance authority | M-64 |
-| [`N-09`](N-09-cascade-invalidation.md) | Cascade invalidation | M-58, M-09 |
-| [`N-10`](N-10-failure-representation.md) | Failure representation | M-36 |
-| [`N-11`](N-11-concurrency.md) | Concurrency model | OQ-13 |
-| [`N-12`](N-12-retention.md) | Retention | M-38 |
-| [`N-13`](N-13-explanation-skeleton.md) | Explanation skeleton | M-07 |
-| [`N-14`](N-14-cross-stage-read-access.md) | Cross-stage read access | OQ-18 |
-| [`N-15`](N-15-evidence-storage.md) | Evidence storage (licence-driven) | OQ-12 |
-| [`N-16`](N-16-source-diversity-propagation.md) | Source diversity propagation | M-23 |
-| [`N-17`](N-17-orchestration-control-model.md) | Orchestration control model | M-35, M-37, OQ-15 |
-| [`N-18`](N-18-orchestration-phasing.md) | Orchestration phasing | C-08 |
-| [`N-19`](N-19-experiment-registry-placement.md) | Experiment Registry placement | M-53 |
-| [`N-20`](N-20-source-model.md) 🔺 | **Source model** | M-16 (partial), OQ-28 |
-| [`N-21`](N-21-acquisition-rights.md) 🔺 | **Acquisition rights** | M-18 (partial) |
-| [`N-22`](N-22-coverage-model.md) | **Coverage model** | M-17 (partial) |
-| [`N-23`](N-23-research-trigger.md) | **Research trigger** | M-01 (partial) |
-
-## Semantics — 5
-
-| ID | Title | Closes |
-|---|---|---|
-| [`S-01`](S-01-calibration-rubric.md) | Calibration rubric — five bands | M-60 |
-| [`S-02`](S-02-evidential-support-function.md) | **Evidential support — five exhaustive inputs** | M-59 |
-| [`S-03`](S-03-claim-equivalence.md) | Claim equivalence | M-62 |
-| [`S-04`](S-04-sufficiency-thresholds.md) | Sufficiency thresholds | M-06 |
-| [`S-05`](S-05-extraction-fidelity.md) | Extraction fidelity | M-67 *(partially)* |
+| **F1** | Redesigning the architecture | **F7** | Starting a task with incomplete dependencies |
+| **F2** | Making an architectural decision yourself | **F8** | Adding an engine, object, stage, component or principle |
+| **F3** | Closing a marker by implementation choice | **F9** | Letting configuration participate in reasoning |
+| **F4** | Skipping acceptance criteria | **F10** | Allowing platform output to become Evidence |
+| **F5** | Rewriting frozen documents | **F11** | Asserting equality in tests |
+| **F6** | Self-approving an escalation | **F12** | Silently proceeding past a contradiction |
 
 ---
 
-## Rules
+## Decision Record Requirements
 
-1. **A marker is closed only by a record here** (Playbook F3).
-2. **Records are immutable once `RATIFIED`** — change by superseding record.
-3. **Six mandatory fields** — see [`../governance/DECISION-TEMPLATE.md`](../governance/DECISION-TEMPLATE.md).
-4. **Cite canonical identifiers only** — resolve through [`../markers/marker-crosswalk.md`](../markers/marker-crosswalk.md).
-5. **Escalations (🔺) need explicit human sign-off** (F6), individually by name.
+Six mandatory fields. A record missing any is incomplete and **must not be
+marked `RATIFIED`**:
 
-## Recorded Reservations
+1. Context
+2. **Alternatives Considered** ← most often skipped, matters most
+3. Decision
+4. Rationale
+5. Consequences Accepted
+6. Revisit Conditions
 
-AS-0…AS-5 are binding and live inside the records they qualify — N-20 §13 and
-N-22 §15. See [`../../PROJECT_STATE.md`](../../PROJECT_STATE.md) §5.
+> *"A decision without rejected alternatives is a preference."*
+> *"Field 6 protects the architecture freeze. With explicit revisit conditions,
+> 'this is inconvenient' is visibly not grounds for reopening."*
+
+**Lifecycle:** `DRAFT → RATIFIED → SUPERSEDED` (or `DRAFT → REJECTED`).
+Records are **immutable once ratified** — change happens by a superseding
+record, never by editing in place.
+
+---
+
+## The Marker Rule
+
+> **A marker is closed only by a record in the decision register. Closing a
+> marker by implementation choice is prohibited — an architecture decision made
+> in code is an architecture decision that cannot be found.**
+
+This single rule is why nine Phase-2 tasks are legitimately blocked rather than
+quietly implemented around.
+
+---
+
+## Escalation
+
+Tasks flagged **⚠** or **🔺** require explicit human sign-off (**F6**). Always.
+
+The recorded form, from precedent (N-7, R-7, R-8, and now N-20/N-21):
+
+> 🔺 **ESCALATION — RATIFIED 2026-08-04.** Approved by the Project Owner.
+
+Escalations are approved **individually, by name**. A feature approval does not
+approve an escalation inside it.
