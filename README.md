@@ -1,75 +1,92 @@
-# Architecture Documents (FROZEN)
+# Decision Records
 
-**These documents are frozen. They must never be edited in place.**
+**41 ratified decisions. One file each — never merged.**
 
-Where a ratified decision changes how one of these should be read, the change
-is recorded in [`../../decisions/records/RATIFICATION-ANNOTATIONS.md`](../../decisions/records/RATIFICATION-ANNOTATIONS.md),
-which is authoritative over the text it annotates.
+This directory is the authority for every architectural question. It outranks
+the IOM, PKP v2 and the Implementation Backlog (Constitution Article XI).
 
-Rewriting a frozen document is **Playbook F5** — forbidden.
-
----
-
-## Files
-
-| File | Lines | What it is |
-|---|---|---|
-| [`PKP_v1_Foundation.txt`](PKP_v1_Foundation.txt) | 64 | The original inheritance. Vision, five principles, ten-stage pipeline, nine engines, three shared components, eight object types, nine-phase roadmap. Four architecture decisions recorded as **bare titles** with no rationale — the omission later marked M-50 |
-| [`PKP_v2_Master_Reference.md`](PKP_v2_Master_Reference.md) | 1,882 | The diagnostic pass over v1. Contains the canonical marker registers: **§11 contradictions, §12 open questions, §13 missing definitions**. This is the authority for marker numbering |
-| [`PKP_Intelligence_Object_Model.md`](PKP_Intelligence_Object_Model.md) | 2,283 | Complete specification of all nine object types across 18 dimensions each. Contains decisions D-01…D-08, ratified as R-1…R-8 |
-| [`PKP_Implementation_Backlog.md`](PKP_Implementation_Backlog.md) | 3,541 | Every task across all phases, with acceptance criteria, dependencies and complexity |
-| [`PKP_PreP1_Blocker_Resolution.md`](PKP_PreP1_Blocker_Resolution.md) | 1,483 | Blocker analysis B-01…B-6x. **Header states: "No decision herein is ratified."** Recommendations only |
+Register index with status and dates:
+[`../governance/DECISION-REGISTER.md`](../governance/DECISION-REGISTER.md)
 
 ---
 
-## Reading Order
+## Architecture Decisions — 5
 
-If you are new, read in this order:
-
-1. **`PKP_v1_Foundation.txt`** — 64 lines. What was inherited.
-2. **`PKP_v2_Master_Reference.md` §1–§10** — what the architecture is.
-3. **`PKP_v2_Master_Reference.md` §11–§13** — what is missing from it. This is
-   the most important part of the corpus.
-4. **`PKP_Intelligence_Object_Model.md` §1–§3** — the object contract.
-5. **`../../decisions/records/`** — what has since been decided.
-
----
-
-## Critical Warnings
-
-### The IOM uses a different marker numbering
-
-The IOM was drafted against an intermediate numbering that **diverged** from
-PKP v2 §13. The *substance* of every IOM statement is sound; the *identifiers*
-are unreliable.
-
-**Ten collisions exist.** Always resolve through
-[`../../decisions/records/marker-crosswalk.md`](../../decisions/records/marker-crosswalk.md)
-before citing any marker seen in the IOM. Four of the most dangerous:
-
-| IOM cites | IOM means | Canonical | v2's own meaning for that number |
+| ID | Title | Status | Closes |
 |---|---|---|---|
-| `MISSING-18` | Source taxonomy / trust | **M-16** | Legal / licensing / terms-of-use |
-| `MISSING-25` | Validation methodology | **M-32** | Pattern type taxonomy |
-| `MISSING-31` | Retention policy | **M-38** | Post-validation promote/reject owner |
-| `MISSING-36` | Outcome intake | **M-47** | Failure-handling policy |
+| [`AD-01`](AD-01-evidence-first.md) | Evidence-First | `RECONSTRUCTED` | — |
+| [`AD-02`](AD-02-intelligence-contracts.md) | Intelligence Contracts | `RECONSTRUCTED` | — |
+| [`AD-03`](AD-03-feedback-loop.md) | Feedback Loop | `RECONSTRUCTED` | — |
+| [`AD-04`](AD-04-separation-of-concerns.md) | Separation of Concerns | `RECONSTRUCTED` | — |
+| [`AD-05`](AD-05-ground-truth-protection.md) | **Ground Truth Protection** | `RATIFIED` | C-04 (jointly) |
 
-### The Blocker Resolution is not authoritative
+> AD-01…AD-04 were inherited from v1 as **bare titles**. Their alternatives are
+> *reconstructed*, not recovered, and must never be cited as evidence of what
+> was historically debated. That omission is M-50 — the project's founding
+> defect.
 
-`PKP_PreP1_Blocker_Resolution.md` contains detailed options and
-recommendations — including B-33 (source taxonomy) and B-34 (licensing), whose
-wording was **lifted verbatim into backlog task descriptions**. This makes
-tasks read as though a decision exists when it does not.
+## IOM Ratifications — 8
 
-Its own header: **"Status: Analysis and recommendation. No decision herein is
-ratified."**
+| ID | Title | Closes |
+|---|---|---|
+| [`R-01`](R-01-immutable-versioned-objects.md) | Immutable versioned objects | M-08 |
+| [`R-02`](R-02-object-lifecycle.md) | Seven-state lifecycle | M-45, OQ-04 |
+| [`R-03`](R-03-confidence-model.md) | Two-component confidence | M-15 |
+| [`R-04`](R-04-temporal-validity.md) | Temporal validity | M-46 |
+| [`R-05`](R-05-canonical-claims.md) | Canonical claims | M-11 |
+| [`R-06`](R-06-relationship-taxonomy.md) | Ten-type relationship taxonomy | M-40 |
+| [`R-07`](R-07-feedback-record.md) 🔺 | Feedback Record as ninth object | C-03 |
+| [`R-08`](R-08-behavioural-loop-closure.md) 🔺 | Behavioural loop closure | C-04 |
 
-### Known unannotated discrepancies
+## Scope, Boundary and Control — 23
 
-| # | Discrepancy |
-|---|---|
-| **D-3** | IOM §3.1 annotates `access_conditions` with "OPEN QUESTION-13", but canonical OQ-13 is *concurrency* (closed by N-11). A licensing-terms marker appears mis-merged |
-| **D-4** | IOM §3.4 defines `source_diversity` as a count of *sources*; S-2 input 2 defines it as *types*. Under Article XI, S-2 governs its own input — but the Pattern attribute is unstated |
-| — | v2 §14 (X14) names the M-18 gap "Legal **and compliance**"; §13 omits compliance. Whether compliance is in scope is unstated |
+| ID | Title | Closes |
+|---|---|---|
+| [`N-01`](N-01-platform-boundary.md) | Platform boundary: advisory | M-03, M-05 |
+| [`N-02`](N-02-human-gates.md) | **Human gates — exactly three** | OQ-02, OQ-05 |
+| [`N-03`](N-03-success-criteria.md) | Success measures | M-04 |
+| [`N-04`](N-04-determinism.md) | Determinism posture | OQ-01 |
+| [`N-05`](N-05-tenancy.md) | Tenancy discriminator | — |
+| [`N-06`](N-06-store-graph-boundary.md) | Store / Graph boundary | C-06, M-39 |
+| [`N-07`](N-07-configuration-referent.md) 🔺 | Configuration referent + CI-1 | M-63 |
+| [`N-08`](N-08-acceptance-authority.md) | Acceptance authority | M-64 |
+| [`N-09`](N-09-cascade-invalidation.md) | Cascade invalidation | M-58, M-09 |
+| [`N-10`](N-10-failure-representation.md) | Failure representation | M-36 |
+| [`N-11`](N-11-concurrency.md) | Concurrency model | OQ-13 |
+| [`N-12`](N-12-retention.md) | Retention | M-38 |
+| [`N-13`](N-13-explanation-skeleton.md) | Explanation skeleton | M-07 |
+| [`N-14`](N-14-cross-stage-read-access.md) | Cross-stage read access | OQ-18 |
+| [`N-15`](N-15-evidence-storage.md) | Evidence storage (licence-driven) | OQ-12 |
+| [`N-16`](N-16-source-diversity-propagation.md) | Source diversity propagation | M-23 |
+| [`N-17`](N-17-orchestration-control-model.md) | Orchestration control model | M-35, M-37, OQ-15 |
+| [`N-18`](N-18-orchestration-phasing.md) | Orchestration phasing | C-08 |
+| [`N-19`](N-19-experiment-registry-placement.md) | Experiment Registry placement | M-53 |
+| [`N-20`](N-20-source-model.md) 🔺 | **Source model** | M-16 (partial), OQ-28 |
+| [`N-21`](N-21-acquisition-rights.md) 🔺 | **Acquisition rights** | M-18 (partial) |
+| [`N-22`](N-22-coverage-model.md) | **Coverage model** | M-17 (partial) |
+| [`N-23`](N-23-research-trigger.md) | **Research trigger** | M-01 (partial) |
 
-These are recorded, not resolved.
+## Semantics — 5
+
+| ID | Title | Closes |
+|---|---|---|
+| [`S-01`](S-01-calibration-rubric.md) | Calibration rubric — five bands | M-60 |
+| [`S-02`](S-02-evidential-support-function.md) | **Evidential support — five exhaustive inputs** | M-59 |
+| [`S-03`](S-03-claim-equivalence.md) | Claim equivalence | M-62 |
+| [`S-04`](S-04-sufficiency-thresholds.md) | Sufficiency thresholds | M-06 |
+| [`S-05`](S-05-extraction-fidelity.md) | Extraction fidelity | M-67 *(partially)* |
+
+---
+
+## Rules
+
+1. **A marker is closed only by a record here** (Playbook F3).
+2. **Records are immutable once `RATIFIED`** — change by superseding record.
+3. **Six mandatory fields** — see [`../governance/DECISION-TEMPLATE.md`](../governance/DECISION-TEMPLATE.md).
+4. **Cite canonical identifiers only** — resolve through [`../markers/marker-crosswalk.md`](../markers/marker-crosswalk.md).
+5. **Escalations (🔺) need explicit human sign-off** (F6), individually by name.
+
+## Recorded Reservations
+
+AS-0…AS-5 are binding and live inside the records they qualify — N-20 §13 and
+N-22 §15. See [`../../PROJECT_STATE.md`](../../PROJECT_STATE.md) §5.
