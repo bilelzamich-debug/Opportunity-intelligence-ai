@@ -1,0 +1,1 @@
+../docs/decisions/R-05-canonical-claims.md

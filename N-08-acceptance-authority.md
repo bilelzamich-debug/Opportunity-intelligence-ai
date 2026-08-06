@@ -1,0 +1,1 @@
+../docs/decisions/N-08-acceptance-authority.md

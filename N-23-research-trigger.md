@@ -1,0 +1,1 @@
+../docs/decisions/N-23-research-trigger.md

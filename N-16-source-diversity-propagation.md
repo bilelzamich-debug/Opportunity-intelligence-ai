@@ -1,0 +1,1 @@
+../docs/decisions/N-16-source-diversity-propagation.md

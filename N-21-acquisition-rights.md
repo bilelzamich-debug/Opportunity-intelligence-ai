@@ -1,0 +1,1 @@
+../docs/decisions/N-21-acquisition-rights.md
