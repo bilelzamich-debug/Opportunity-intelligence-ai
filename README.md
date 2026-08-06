@@ -1,15 +1,11 @@
-# Examples
+# Superseded Validation Artefacts
 
-Worked examples from the Intelligence Object Model, extracted so an
-implementer can see a fully-populated object of each type.
+Retained for audit trail. **These do not run as part of `verify_all.sh`.**
 
-| File | Contents |
+| File | Why superseded |
 |---|---|
-| [`worked-objects.md`](worked-objects.md) | Complete IOM examples for Evidence, Fact, Problem, Pattern |
-| [`confidence-worked-example.md`](confidence-worked-example.md) | The IOM §2.3 ceiling calculation, reproduced as a P1 test |
+| `verify_t02_1_1_blocker.py` | Asserted **M-16 is OPEN** with 33 checks, substantiating the Phase-2 blocking escalation. N-20 (ratified 2026-08-04) closes M-16 *partially*, so the assertion is historically true but currently false **by design** |
+| `verify_t02_1_1.pre-ratification.py` | Snapshot of `verify_t02_1_1.py` as it stood before N-20. Its check "no ratified decision closes M-16" was retargeted to "M-16 closed only partially, only by N-20" |
 
-**These are illustrative, not normative.** The single `source_type` value
-appearing in the IOM Evidence example (`customer_review_corpus`) is inside a
-fenced code block under a `#### Example` heading — it is **not** a taxonomy
-member, and treating it as one was explicitly rejected during the M-16
-investigation.
+Both are kept because they are the mechanical evidence that the blocker was
+real. Deleting them would erase the proof that the escalation was justified.
