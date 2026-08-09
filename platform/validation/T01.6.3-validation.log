@@ -1,0 +1,89 @@
+T01.6.3 VALIDATION LOG -- Failure Surfacing
+Recorded: 2026-08-03
+
+=== FULL SUITE ===
+2574 passed, 85 deselected. 0 failed.
+(baseline before this task: 2465 passed -> +109 new tests)
+
+=== ARCHITECTURE VERIFICATION ===
+52/52 mechanical checks passed (validation/verify_t01_6_3.py)
+Includes extraction of N-10's six identifications directly from the decision
+record and empirical confirmation that an orchestrated failure satisfies all six.
+
+=== ADVERSARIAL PROBES ===
+round 1: 45 probes -- all passed (1 real defect found: hostile __str__)
+round 2: 26 probes -- all passed (1 real defect found: hostile failure store)
+round 3: 14 probes -- all passed
+Total 85 probes across 3 rounds.
+T01.6.2 probe suites re-run: all still green (no regression).
+
+=== COVERAGE ===
+oip/orchestration.py   566 stmts   1 miss   148 branch   1 partial   99.7%
+  (the single miss is line 509, the pre-existing EngineInvoker Protocol
+   ellipsis from T01.6.1 -- not code introduced by this task)
+oip/acceptance.py      291 stmts   2 miss                            99.5%
+oip/configuration.py   121 stmts   2 miss                            98.5%
+TOTAL 6023 stmts, 98.95%  (was 98.94% before this task)
+Every module remains >= 95%. Lowest: integrity.py 95.9% (unchanged).
+
+=== MUTATION TESTING ===
+27 mutations across orchestration.py, acceptance.py and configuration.py.
+27 killed, 0 survivors, 0 inapplicable.
+Three survived on the first pass and were genuine TEST gaps, not code defects:
+  M14 store faults leak between cycles      -> needed an aborted-cycle test
+  M19 attribution ignores inputs attempted  -> needed per-field attribution tests
+  M27 every_failure_is_visible always true  -> needed an under-reporting cycle
+All three now killed by added regression tests.
+Sources restored byte-identical, verified with `diff -q`.
+
+=== STRESS ===
+85 passed (78 pre-existing + 7 new TestFailureSurfacingStress), 0 failed.
+Runtime 994s. Includes 50,000 failures across 100 cycles remaining exactly
+visible and unmasked, and a hostile store at volume never masking.
+
+=== BENCHMARKS (best-of-3, 2-core shared host) ===
+run 1  PASS   run 2  PASS   run 3  PASS
+No metric regressed beyond threshold on any run. Baseline NOT re-recorded.
+
+=== DEFECTS FOUND AND FIXED ===
+
+1. N-10 CONFORMANCE GAP (found during extraction, before coding).
+   N-10 requires every failure record to identify six things. FailureRecord
+   carried only three: the engine survived merely as a substring of object_id,
+   and the invocation and attempted inputs were unrecoverable. Confirmed
+   empirically against a live orchestrated failure (inputs ev-1/ev-2 lost).
+   Fixed additively: optional engine/cycle_id/invocation_index/input_ids
+   fields defaulting to None/(), populated by orchestration, plus
+   satisfies_n10_attribution reporting conformance rather than assuming it.
+   All four existing producers unchanged.
+
+2. HOSTILE EXCEPTION RENDERING ABORTED THE CYCLE.
+   The failure detail was built with an f-string, calling str(exc). An engine
+   whose exception has a raising __str__ made that call raise from inside the
+   except handler; the new exception propagated out of run_cycle, the entire
+   cycle record was discarded, remaining work was never attempted and the
+   failure was never recorded. Exactly the "one engine fails mid-batch,
+   leaving inconsistent state" mode PKP v2 4.12 names, breaching N-10 and AC2.
+   Fixed with _describe_exception(), which reads the type from the class and
+   can never itself raise. KeyboardInterrupt/SystemExit deliberately excluded
+   -- they are control signals, and recording one as an engine failure would
+   misattribute a shutdown.
+
+3. A RAISING FAILURE STORE MADE EVERY FAILURE INVISIBLE.
+   failure_store.record() was called unguarded, so a store fault propagated
+   out of run_cycle and destroyed the whole cycle record: total masking, the
+   worst N-10 outcome. Fixed by guarding the write, keeping the record on the
+   CycleRecord regardless, and recording the persistence fault itself as a
+   FAILURE-STORE-UNAVAILABLE record so it is not swallowed either. No retry
+   [M-36 policy half OPEN]. The per-cycle fault list is reset at cycle START,
+   which a mutation proved load-bearing: without it an aborted cycle's stale
+   fault is misattributed to the next cycle.
+
+=== SPECIFICATION CONFLICT RECORDED, NOT RESOLVED ===
+N-10's header and TIMELINE.md state that N-10 closes M-36, but PKP v2 s13
+still lists M-36 as open and marker-crosswalk.md records M-36 as compound:
+"policy + representation". N-10's Decision section addresses representation
+only and states no retry/skip/halt/compensate rule. The POLICY half is
+therefore treated as OPEN and failed closed: no retry, skip, halt,
+compensation or recovery is implemented. Documented in
+validation/T01.6.3-specification.md section 7 and in the module header.

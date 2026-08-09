@@ -1,0 +1,88 @@
+T01.6.4 VALIDATION LOG -- Concurrency Boundary (N-11)
+Recorded: 2026-08-03
+
+=== FULL SUITE ===
+2694 passed, 93 deselected. 0 failed.
+(baseline before this task: 2574 passed -> +120 new tests)
+
+=== ARCHITECTURE VERIFICATION ===
+64/64 mechanical checks passed (validation/verify_t01_6_4.py)
+Includes N-11's decision text and concurrency table extracted verbatim from
+the decision record, the full IOM 2.6 stage table extracted row by row, and
+empirical confirmation of all three acceptance criteria under live threads.
+
+=== ADVERSARIAL PROBES ===
+round 1: 51 probes -- all passed (1 real defect found: bounded-phase starvation)
+round 2: 21 probes -- all passed (1 probe error corrected, not a code defect)
+round 3: 17 probes -- all passed
+Total 89 probes across 3 rounds.
+T01.6.2 and T01.6.3 probe suites re-run: all still green (no regression).
+
+=== COVERAGE ===
+oip/orchestration.py   736 stmts   1 miss   202 branch   0 partial   99.9%
+  (the single miss is line 685, the pre-existing EngineInvoker Protocol
+   ellipsis from T01.6.1 -- not code introduced by this task)
+oip/enums.py            78 stmts   0 miss                           100.0%
+TOTAL 6196 stmts, 98.99%  (was 98.95% before this task)
+Every module remains >= 95%. Lowest: integrity.py 95.9% (unchanged).
+
+=== MUTATION TESTING ===
+32 mutations across orchestration.py and enums.py.
+31 killed, 1 survivor, 0 inapplicable. Sources restored byte-identical.
+
+Two survived the first pass:
+  M15 serialised phases dispatched in parallel too  -> EQUIVALENT MUTANT
+  M18 worker results not guarded by the lock        -> now killed
+
+M15 is provably equivalent and remains a survivor by design. ExecutionPhase
+refuses a multi-item serialised phase at construction, so `len(admitted) > 1`
+is unreachable for a serialised phase and the `phase.is_parallel` conjunct
+cannot change behaviour. The redundant guard is retained because it states the
+N-11 intent at the point of dispatch. Demonstrated by
+TestEquivalentMutantGuards::test_a_serialised_phase_can_never_hold_more_than_one_item.
+
+M18 survived because dict assignment and list.extend are atomic under CPython's
+GIL, so its removal is unobservable on this interpreter. The lock is required
+on a free-threaded build, so its presence is now asserted directly.
+
+=== STRESS ===
+93 passed (85 pre-existing + 8 new TestConcurrencyBoundaryStress), 0 failed.
+Runtime 1033s. Includes 50,000 concurrent items exact; the barrier verified
+across 2,000 randomised mixed cycles; a live overlap detector under sustained
+8-worker pressure; 20,000 items with zero duplicate invocation; no thread leak
+across 500 parallel cycles; and confirmation that parallel beats sequential on
+IO-bound work (N-11's concurrent half genuinely functions).
+
+=== BENCHMARKS (best-of-5, 2-core shared host) ===
+run 1 PASS   run 2 PASS   run 3 REGRESSION (depth drift +41.4%)   run 4 PASS   run 5 PASS
+4 of 5 runs clean. The single flagged run hit the depth-drift metric already
+documented as the noisiest on this host (T01.6.2 saw the same metric flag once
+and recover). Verified mechanically that benchmarks/bench_identity.py imports
+only oip.identity and never loads oip.orchestration, so this task's code is not
+on any benchmarked path. Baseline NOT re-recorded.
+
+=== DEFECT FOUND AND FIXED ===
+
+BOUNDED CONCURRENT PHASE STARVED THE WHOLE CYCLE.
+Phase admission was all-or-nothing: a phase whose size exceeded the remaining
+work budget was refused entire. A work set of 12 acquisition items forms ONE
+concurrent phase, so under max_work_items=4 the parallel path attempted ZERO
+items while the sequential path attempted 4. Starvation is a named Orchestration
+failure mode (PKP v2 4.12), and the divergence meant concurrency silently
+changed how much work a bounded cycle performed -- which N-11 must never do.
+Root cause: the bound counts WORK, not phases. Fixed by admitting the prefix of
+a phase that fits the remaining budget, which is exactly the work the sequential
+path would have run. Sequential and parallel now agree at every limit, verified
+exhaustively for limits 1..13 and by property test over random bounds.
+
+=== SPECIFICATION NOTES ===
+No document conflicts found. N-11, IOM 2.6, R-1, N-17 and B-09 agree on every
+point binding this task.
+
+Ambiguity A1 (the instruction to "preserve deterministic behaviour" versus N-4,
+which guarantees reproducible INPUTS but explicitly not deterministic OUTPUTS)
+was resolved in favour of the ratified decision: determinism is enforced in
+every respect the platform controls -- recorded invocation order is always
+work-set order regardless of thread completion order, results are reassembled
+by index, and bounds apply deterministically. Engine outputs remain
+non-deterministic per N-4, which this task does not change.

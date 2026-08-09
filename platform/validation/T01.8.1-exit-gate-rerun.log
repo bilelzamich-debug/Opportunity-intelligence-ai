@@ -1,0 +1,93 @@
+T01.8.1 PHASE 1 EXIT GATE -- RE-RUN
+Recorded: 2026-08-04
+
+OUTCOME: PHASE 1 NOT APPROVED FOR CLOSURE.
+A real, previously undetected defect was found during the gate. Per the
+working method ("if a defect is found, stop immediately after fixing it and
+report it"), the gate halted after the fix. Closure requires a further task.
+
+=== STRUCTURAL EXIT VERIFICATION (completed before the defect) ===
+exit_gate_t01_8_1_rerun.py   91/91 checks passed
+  A. Definition of Done, Functional (1-9)      35/35
+  B. Definition of Done, Contract (10-14)      18/18
+  C. T01.8.1 backlog acceptance criteria         4/4
+  D. Architectural validations                 28/28
+  E. Forbidden closures / open markers           6/6
+
+exit_gate_t01_8_1_tasks.py   25/26 checks passed
+  44 Phase 1 tasks enumerated; F01.1-F01.8 all present
+  FAILED: "every Phase 1 task id is cited in code or tests" -> T01.2.4
+
+That single failure is what exposed the defect below.
+
+=== DEFECT FOUND: T01.2.4 PARTIAL RETRACTION WAS NEVER IMPLEMENTED ===
+Cascade invalidated EVERY forward dependent, including objects that still
+retained a valid upstream reference. That contradicts two ratified sources:
+
+  N-9 "What It Binds": "T01.2.4 partial retraction: an object retaining at
+  least one valid upstream reference is re-versioned, not invalidated."
+
+  N-9 "Consequences Accepted": "A dependent supported by ten Facts, one of
+  which is invalidated, is handled by the partial-retraction rule rather than
+  by cascade -- the boundary between the two must be maintained carefully."
+
+  IOM 3.2 (Fact transitions): ACTIVE -> INVALIDATED on "All attesting
+  Evidence retracted". Not "some".
+
+Demonstrated before the fix: a Fact derived from two Evidence objects was
+INVALIDATED when only ONE was retracted.
+
+=== FIX APPLIED (oip/cascade.py only) ===
+- _retains_valid_upstream(stored, doomed): an upstream still attests unless it
+  is RETRACTED/INVALIDATED, or is itself doomed by this same cascade.
+- A `doomed` set seeded with the origin and extended as dependents become
+  eligible. Necessary because eligibility is computed before any mutation for
+  rollback safety, so an upstream reading ACTIVE may already be condemned.
+  Breadth-first ordering guarantees an upstream is decided before its child.
+- CascadeResult.partially_retracted / .partial_count report the spared
+  objects, so the N-9 boundary is visible rather than silent.
+- Cascade still performs NO interpretation: it does not re-version. Producing
+  a new version with reduced support is the owning engine's act; cascade
+  "alters status only, never content" (N-9).
+
+Verified: ACTIVE <=> retains >=1 non-withdrawn upstream, in every case.
+Single-parent chains still cascade fully (Evidence -> Fact -> Problem ->
+Pattern all INVALIDATED). Retracting ALL upstream still invalidates.
+T01.2.4's three acceptance criteria now pass, and the rule is type-agnostic
+(verified on Fact-from-Evidence and Problem-from-Facts).
+
+=== SUITE STATE AT STOP ===
+3071 passed, 16 failed, 112 deselected.
+
+The 16 failures are in 8 suites and are all the same shape: they assert that a
+multi-parent dependent is INVALIDATED when only one parent is withdrawn --
+the pre-T01.2.4 behaviour N-9 explicitly assigns to the partial-retraction
+rule rather than to cascade. Each was mechanically confirmed to be a genuine
+partial-retention case, not a fault in the fix.
+
+  test_execution.py   ::TestPipelineIntegration::test_cascade_invalidates_the_record
+  test_execution.py   ::TestPipelineIntegration::test_cascade_is_not_suppression
+  test_fact.py        ::TestStoreIntegration::test_retracting_evidence_invalidates_the_fact
+  test_feedback.py    ::TestPipelineIntegration::test_cascade_invalidates_the_lesson
+  test_opportunity.py ::TestPipelineIntegration::test_retracting_evidence_invalidates_the_opportunity
+  test_pattern.py     ::TestPatternIntegrity::test_pti1_ignores_a_withdrawn_pattern
+  test_pattern.py     ::TestPipelineIntegration::test_retracting_evidence_invalidates_the_pattern
+  test_pattern.py     ::TestPipelineIntegration::test_invalidating_a_problem_invalidates_the_pattern
+  test_problem.py     ::TestProblemIntegrity::test_pi2_does_not_fault_a_withdrawn_problem
+  test_problem.py     ::TestPipelineIntegration::test_retracting_evidence_invalidates_the_problem
+  test_problem.py     ::TestPipelineIntegration::test_invalidating_a_fact_invalidates_the_problem
+  test_solution.py    ::TestPipelineIntegration::test_retracting_evidence_invalidates_the_solution
+  test_solution.py    ::TestPipelineIntegration::test_cascade_invalidates_every_sibling
+  test_solution.py    ::TestAdversarial::test_cascade_is_not_an_assessment_change
+  test_validation.py  ::TestNegativeResultsAreActive::test_cascade_invalidation_is_not_suppression
+  test_validation.py  ::TestPipelineIntegration::test_retracting_evidence_invalidates_the_validation
+
+tests/test_cascade.py was corrected before the stop decision: its
+test_partial_parent_loss_still_invalidates directly contradicted N-9 and was
+rewritten to the ratified semantics, plus a new
+test_total_parent_loss_still_invalidates. That suite is green (61 passed).
+
+=== NOT RE-RUN (invalidated by the production change) ===
+Coverage, mutation testing, stress and benchmarks were NOT re-run after the
+cascade change. Their previous results no longer characterise the current
+tree and must not be cited as current evidence.

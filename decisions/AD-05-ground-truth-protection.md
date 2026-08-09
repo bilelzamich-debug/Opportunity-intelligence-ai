@@ -1,0 +1,1 @@
+../docs/decisions/AD-05-ground-truth-protection.md

@@ -1,0 +1,708 @@
+{
+ "T01.1.1": {
+  "line": 804,
+  "desc": "Implement object identity: object_id (unique, never reused), lineage_id (stable across versions), version (monotonic from 1). ",
+  "fields": {
+   "Depends on": "`T00.7.1`",
+   "Complexity": "M",
+   "Deliverable": "Identity allocation component",
+   "Blocks": "`T01.1.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "object_id uniqueness enforced",
+   "lineage_id constant across a supersession chain",
+   "version increments by exactly 1",
+   "Reuse of a retired object_id is rejected"
+  ]
+ },
+ "T01.1.2": {
+  "line": 823,
+  "desc": "Implement the universal required attribute set (17 attributes from IOM \u00a71.1) as the base object contract. ",
+  "fields": {
+   "Depends on": "`T01.1.1`",
+   "Complexity": "L",
+   "Deliverable": "Universal object contract",
+   "Blocks": "`T01.1.3`, `T01.1.4`, `T01.3.1`, `T01.4.1`, `T01.5.1`, `T01.5.4`, `T09.2.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "All 17 attributes present on every persisted object",
+   "Missing attribute blocks acceptance",
+   "tenancy discriminator reserved per N-5"
+  ]
+ },
+ "T01.1.3": {
+  "line": 841,
+  "desc": "Implement the universal optional attribute set (valid_until, duplicates, contradicts, supersedes, superseded_by, tags). ",
+  "fields": {
+   "Depends on": "`T01.1.2`",
+   "Complexity": "S",
+   "Deliverable": "Optional attribute support",
+   "Blocks": "\u2014 (nothing)",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Optional attributes accepted when present",
+   "tags carry no engine-dependent semantics"
+  ]
+ },
+ "T01.1.4": {
+  "line": 858,
+  "desc": "Implement immutable object persistence with atomic write per N-6. ",
+  "fields": {
+   "Depends on": "`T01.1.2`, `T01.4.1`",
+   "Complexity": "L",
+   "Deliverable": "Knowledge Store write path",
+   "Blocks": "`T01.1.5`, `T01.1.6`, `T01.2.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Content immutable after acceptance",
+   "Write is atomic",
+   "Partial writes impossible",
+   "Hard delete unsupported"
+  ]
+ },
+ "T01.1.5": {
+  "line": 877,
+  "desc": "Implement supersession chains: linear, non-branching, exactly one ACTIVE version per lineage_id (I5). ",
+  "fields": {
+   "Depends on": "`T01.1.4`",
+   "Complexity": "M",
+   "Deliverable": "Versioning mechanism",
+   "Blocks": "`T01.4.4`, `T05.1.7`, `T06.3.6`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Supersession creates a new version",
+   "Predecessor transitions to SUPERSEDED",
+   "Two ACTIVE versions of one lineage_id rejected",
+   "Branching rejected"
+  ]
+ },
+ "T01.1.6": {
+  "line": 896,
+  "desc": "Implement configuration store per N-7: immutable, versioned config records referenced by engine_configuration_ref. ",
+  "fields": {
+   "Depends on": "`T01.1.4`",
+   "Complexity": "M",
+   "Deliverable": "Configuration store",
+   "Blocks": "`T01.1.7`, `T08.2.4`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Config records immutable and versioned",
+   "engine_configuration_ref resolves",
+   "Config history queryable for a given point in time"
+  ]
+ },
+ "T01.1.7": {
+  "line": 914,
+  "desc": "Implement failure record store per N-10, outside the object model. ",
+  "fields": {
+   "Depends on": "`T01.1.6`",
+   "Complexity": "M",
+   "Deliverable": "Failure record store",
+   "Blocks": "`T01.6.1`, `T01.6.3`, `T02.2.5`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Failure records excluded from lineage graph",
+   "Empty result distinguishable from failed processing",
+   "Failures attributable to engine and invocation"
+  ]
+ },
+ "T01.2.1": {
+  "line": 934,
+  "desc": "Implement the seven-state lifecycle with per-type reachability constraints. ",
+  "fields": {
+   "Depends on": "`T01.1.4`",
+   "Complexity": "L",
+   "Deliverable": "Lifecycle state machine",
+   "Blocks": "`T01.2.2`, `T06.3.4`, `T07.3.3`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "All seven states implemented",
+   "Evidence cannot reach INVALIDATED",
+   "Terminal states cannot transition",
+   "status_reason required when status != ACTIVE"
+  ]
+ },
+ "T01.2.2": {
+  "line": 953,
+  "desc": "Implement status transition as the sole permitted non-versioning mutation. ",
+  "fields": {
+   "Depends on": "`T01.2.1`",
+   "Complexity": "M",
+   "Deliverable": "Status transition path",
+   "Blocks": "`T01.2.3`, `T01.2.5`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Status changes without new version",
+   "Content unchanged by transition",
+   "All other mutation rejected"
+  ]
+ },
+ "T01.2.3": {
+  "line": 971,
+  "desc": "Implement cascade invalidation per N-9: forward traversal, bulk transition to INVALIDATED, no interpretation. ",
+  "fields": {
+   "Depends on": "`T01.2.2`, `T01.3.3`",
+   "Complexity": "L",
+   "Deliverable": "Cascade invalidation operation",
+   "Blocks": "`T01.2.4`, `T01.4.5`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Retracting Evidence invalidates all dependents",
+   "Traversal terminates",
+   "Operation is idempotent",
+   "No content altered, only status"
+  ]
+ },
+ "T01.2.4": {
+  "line": 990,
+  "desc": "Implement partial-retraction semantics at the object layer: an object retaining at least one valid upstream reference is re-versioned with reduced support rather than invalidated. Applies to the Fact attachment case once F03 lands. ",
+  "fields": {
+   "Depends on": "`T01.2.3`",
+   "Complexity": "M",
+   "Deliverable": "Partial retraction rule",
+   "Blocks": "\u2014 (nothing)",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Object with some upstream references retracted remains ACTIVE at a new version",
+   "Object with all upstream references retracted becomes INVALIDATED",
+   "Rule is type-agnostic; Fact attachment behaviour follows from it"
+  ]
+ },
+ "T01.2.5": {
+  "line": 1008,
+  "desc": "Implement ARCHIVED tiering per N-12: lineage skeleton permanent, content tiered by reachability. ",
+  "fields": {
+   "Depends on": "`T01.2.2`, `T01.3.4`",
+   "Complexity": "L",
+   "Deliverable": "Retention/archival mechanism",
+   "Blocks": "`T01.8.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Objects reachable from any ACTIVE object are never archived",
+   "Lineage traversal never breaks after archival",
+   "content_fingerprint and provenance retained permanently"
+  ]
+ },
+ "T01.3.1": {
+  "line": 1028,
+  "desc": "Implement the closed ten-type relationship taxonomy (D-06) with asserting-engine attribution. ",
+  "fields": {
+   "Depends on": "`T01.1.2`",
+   "Complexity": "L",
+   "Deliverable": "Relationship model",
+   "Blocks": "`T01.3.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Exactly ten types accepted",
+   "Undefined relationship types rejected",
+   "Every relationship records asserting engine and timestamp",
+   "DERIVES_FROM and SUPPORTS are distinct"
+  ]
+ },
+ "T01.3.2": {
+  "line": 1047,
+  "desc": "Implement objects-authoritative lineage per N-6: lineage carried on the object, version-specific binding (D-01a). ",
+  "fields": {
+   "Depends on": "`T01.3.1`",
+   "Complexity": "L",
+   "Deliverable": "Lineage attribute model",
+   "Blocks": "`T01.3.3`, `T01.3.6`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "derives_from binds to specific versions",
+   "References never repoint (I3)",
+   "Object is self-describing without the graph"
+  ]
+ },
+ "T01.3.3": {
+  "line": 1065,
+  "desc": "Implement the Knowledge Graph as a derived, rebuildable traversal index. ",
+  "fields": {
+   "Depends on": "`T01.3.2`",
+   "Complexity": "XL",
+   "Deliverable": "Knowledge Graph index",
+   "Blocks": "`T01.2.3`, `T01.3.4`, `T01.3.5`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Graph rebuildable from objects alone",
+   "Divergence recoverable by rebuild",
+   "Graph is never the authority on a relationship"
+  ]
+ },
+ "T01.3.4": {
+  "line": 1083,
+  "desc": "Implement backward traversal (object to Evidence) with guaranteed termination. ",
+  "fields": {
+   "Depends on": "`T01.3.3`",
+   "Complexity": "M",
+   "Deliverable": "Backward traversal",
+   "Blocks": "`T01.2.5`, `T01.4.2`, `T01.5.2`, `T05.2.1`, `T06.3.3`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Every non-Evidence object reaches at least one Evidence object",
+   "Traversal terminates on all inputs",
+   "Depth 8 supported"
+  ]
+ },
+ "T01.3.5": {
+  "line": 1101,
+  "desc": "Implement forward traversal (Evidence to dependents) for impact analysis and cascade. ",
+  "fields": {
+   "Depends on": "`T01.3.3`",
+   "Complexity": "M",
+   "Deliverable": "Forward traversal",
+   "Blocks": "\u2014 (nothing)",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "All dependents of an Evidence object identifiable",
+   "Supports cascade invalidation"
+  ]
+ },
+ "T01.3.6": {
+  "line": 1118,
+  "desc": "Implement cycle prevention (V10): reject any write introducing a lineage cycle. ",
+  "fields": {
+   "Depends on": "`T01.3.2`",
+   "Complexity": "M",
+   "Deliverable": "Cycle guard",
+   "Blocks": "`T01.4.4`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Cycle-introducing write rejected at acceptance",
+   "Feedback Record cannot create a path back to Evidence (FR-I2)"
+  ]
+ },
+ "T01.4.1": {
+  "line": 1137,
+  "desc": "Implement the acceptance path per N-8: Store enforces, rules specified in the object model. ",
+  "fields": {
+   "Depends on": "`T01.1.2`",
+   "Complexity": "L",
+   "Deliverable": "Acceptance enforcement point",
+   "Blocks": "`T01.1.4`, `T01.4.2`, `T01.4.6`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "PROPOSED to ACTIVE gated by rule evaluation",
+   "Rules externally specified, not embedded in the Store",
+   "Failed acceptance produces a failure record"
+  ]
+ },
+ "T01.4.2": {
+  "line": 1155,
+  "desc": "Implement universal validation rules V1-V4 (attributes present, derives_from non-empty, references resolve, Evidence reachable). ",
+  "fields": {
+   "Depends on": "`T01.4.1`, `T01.3.4`",
+   "Complexity": "L",
+   "Deliverable": "Validation rules V1-V4",
+   "Blocks": "`T01.4.3`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Each rule independently testable",
+   "V2 exempts Evidence only",
+   "V4 verified by actual traversal, not assertion"
+  ]
+ },
+ "T01.4.3": {
+  "line": 1173,
+  "desc": "Implement universal validation rules V5-V8 (confidence ceiling, explanation non-empty, create authority, timestamp ordering). ",
+  "fields": {
+   "Depends on": "`T01.4.2`, `T01.5.2`",
+   "Complexity": "M",
+   "Deliverable": "Validation rules V5-V8",
+   "Blocks": "`T01.4.4`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "V5 rejects any object exceeding min(upstream effective_confidence)",
+   "V7 rejects writes from engines lacking create authority",
+   "V8 enforces observed_at <= asserted_at <= produced_at"
+  ]
+ },
+ "T01.4.4": {
+  "line": 1191,
+  "desc": "Implement universal validation rules V9-V12 (status_reason, cycles, version increment, closed taxonomy). ",
+  "fields": {
+   "Depends on": "`T01.4.3`, `T01.3.6`, `T01.1.5`",
+   "Complexity": "M",
+   "Deliverable": "Validation rules V9-V12",
+   "Blocks": "`T01.4.5`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Each rule independently testable",
+   "V11 enforces version and lineage_id integrity"
+  ]
+ },
+ "T01.4.5": {
+  "line": 1208,
+  "desc": "Implement universal integrity constraints I1-I8 as continuous invariants, not acceptance-time checks. ",
+  "fields": {
+   "Depends on": "`T01.4.4`, `T01.2.3`",
+   "Complexity": "L",
+   "Deliverable": "Integrity constraint enforcement",
+   "Blocks": "`T01.7.1`, `T01.8.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "I5 (one ACTIVE per lineage_id) continuously held",
+   "I6 (cascade) enforced via T01.2.3",
+   "I8 prevents REJECTED objects being consumed as input"
+  ]
+ },
+ "T01.4.6": {
+  "line": 1226,
+  "desc": "Implement the semantic-check hook in the acceptance path for rules structure cannot enforce (F-V6). ",
+  "fields": {
+   "Depends on": "`T01.4.1`",
+   "Complexity": "M",
+   "Deliverable": "Semantic verification hook",
+   "Blocks": "`T01.7.2`, `T03.2.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Hook invocable at acceptance",
+   "Anchor verification pluggable",
+   "Documented as not covering paraphrase drift"
+  ]
+ },
+ "T01.5.1": {
+  "line": 1246,
+  "desc": "Implement the two-component confidence model: evidential_support, assertion_confidence, effective_confidence with band labels. ",
+  "fields": {
+   "Depends on": "`T01.1.2`",
+   "Complexity": "M",
+   "Deliverable": "Confidence attribute model",
+   "Blocks": "`T01.5.2`, `T01.5.5`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Both components stored independently",
+   "Five bands implemented",
+   "Well-evidenced/low-confidence case representable"
+  ]
+ },
+ "T01.5.2": {
+  "line": 1264,
+  "desc": "Implement the monotonic ceiling rule: effective_confidence <= min(upstream effective_confidence). ",
+  "fields": {
+   "Depends on": "`T01.5.1`, `T01.3.4`",
+   "Complexity": "L",
+   "Deliverable": "Ceiling enforcement",
+   "Blocks": "`T01.4.3`, `T01.5.3`, `T06.3.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Ceiling computed from actual lineage",
+   "Violation rejected at acceptance",
+   "Worked chain 0.62 to 0.58 reproduces IOM example"
+  ]
+ },
+ "T01.5.3": {
+  "line": 1282,
+  "desc": "Implement the evidential_support function per S-2, over independent source count and diversity. ",
+  "fields": {
+   "Depends on": "`T01.5.2`, `T01.5.4`",
+   "Complexity": "L",
+   "Deliverable": "Support computation",
+   "Blocks": "`T01.7.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Deterministic given lineage",
+   "Comparable across object types",
+   "Recomputed on upstream change"
+  ]
+ },
+ "T01.5.4": {
+  "line": 1300,
+  "desc": "Implement the independent-source-count summary attribute per M-23, carried on every object. ",
+  "fields": {
+   "Depends on": "`T01.1.2`",
+   "Complexity": "M",
+   "Deliverable": "Diversity summary attribute",
+   "Blocks": "`T01.5.3`, `T01.7.4`, `T05.1.4`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Populated at creation",
+   "Propagates without deep traversal",
+   "Available to Pattern Intelligence at depth 3"
+  ]
+ },
+ "T01.5.5": {
+  "line": 1318,
+  "desc": "Implement calibration rubric conformance: engines assert confidence against the S-1 rubric. ",
+  "fields": {
+   "Depends on": "`T01.5.1`",
+   "Complexity": "M",
+   "Deliverable": "Calibration conformance check",
+   "Blocks": "`T08.3.5`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Rubric bands referenced at assertion",
+   "Deviations recorded",
+   "Cross-engine comparison documented as rubric-dependent"
+  ]
+ },
+ "T01.6.1": {
+  "line": 1338,
+  "desc": "Implement scheduled batch invocation per N-11 and the M-35 control model. ",
+  "fields": {
+   "Depends on": "`T01.1.7`",
+   "Complexity": "L",
+   "Deliverable": "Orchestration invocation",
+   "Blocks": "`T01.6.2`, `T01.6.5`, `T02.2.4`, `T08.2.7`, `T09.1.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Engines invoked on schedule",
+   "Batch boundaries defined",
+   "Iteration bounded"
+  ]
+ },
+ "T01.6.2": {
+  "line": 1356,
+  "desc": "Implement processing-state tracking: what has been processed, by which engine, when. ",
+  "fields": {
+   "Depends on": "`T01.6.1`",
+   "Complexity": "L",
+   "Deliverable": "Processing state store",
+   "Blocks": "`T01.6.3`, `T01.6.4`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Idempotence supported: reprocessing detectable",
+   "State held outside the object model",
+   "Orchestration reads metadata only, never content"
+  ]
+ },
+ "T01.6.3": {
+  "line": 1374,
+  "desc": "Implement failure surfacing: engine failures recorded and visible, never masked as completion. ",
+  "fields": {
+   "Depends on": "`T01.6.2`, `T01.1.7`",
+   "Complexity": "M",
+   "Deliverable": "Failure surfacing",
+   "Blocks": "`T09.1.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Failed invocation distinguishable from empty result",
+   "Failures do not silently halt the pipeline"
+  ]
+ },
+ "T01.6.4": {
+  "line": 1391,
+  "desc": "Implement concurrency boundary per N-11: parallel acquisition/extraction, serialised interpretation. ",
+  "fields": {
+   "Depends on": "`T01.6.2`",
+   "Complexity": "L",
+   "Deliverable": "Concurrency control",
+   "Blocks": "`T05.1.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Problem-stage-onward writes serialised",
+   "Pattern Intelligence sees a stable population per batch",
+   "Version branching impossible"
+  ]
+ },
+ "T01.6.5": {
+  "line": 1409,
+  "desc": "Implement sequencing enforcement: an engine cannot run before its inputs exist. ",
+  "fields": {
+   "Depends on": "`T01.6.1`",
+   "Complexity": "M",
+   "Deliverable": "Sequencing guard",
+   "Blocks": "`T01.8.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Pipeline order never violated",
+   "Out-of-order invocation rejected"
+  ]
+ },
+ "T01.7.1": {
+  "line": 1428,
+  "desc": "Realise the Evidence object type: attributes, E-V1..E-V6, E-I1..E-I4. ",
+  "fields": {
+   "Depends on": "`T01.4.5`, `T01.5.3`",
+   "Complexity": "L",
+   "Deliverable": "Evidence type",
+   "Blocks": "`T01.7.2`, `T02.2.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "derives_from empty enforced (E-V1)",
+   "E-I2 rejects platform-internal derivation",
+   "Duplicate fingerprint+source rejected (E-V6)"
+  ]
+ },
+ "T01.7.2": {
+  "line": 1446,
+  "desc": "Realise the Fact object type including the evidence_attachment structure and F-V1..F-V6. ",
+  "fields": {
+   "Depends on": "`T01.7.1`, `T01.4.6`",
+   "Complexity": "XL",
+   "Deliverable": "Fact type",
+   "Blocks": "`T01.7.3`, `T03.1.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Multiple attachments per Fact supported",
+   "Positional anchor required per attachment",
+   "independent_source_count <= attachment count",
+   "F-V6 hook wired"
+  ]
+ },
+ "T01.7.3": {
+  "line": 1465,
+  "desc": "Realise the Problem object type: attributes, P-V1..P-V6, P-I1..P-I4. ",
+  "fields": {
+   "Depends on": "`T01.7.2`",
+   "Complexity": "L",
+   "Deliverable": "Problem type",
+   "Blocks": "`T01.7.4`, `T04.1.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "inference_basis distinct from explanation",
+   "P-V2 solution-independence check present",
+   "affected_population required"
+  ]
+ },
+ "T01.7.4": {
+  "line": 1483,
+  "desc": "Realise the Pattern object type: attributes, PT-V1..PT-V6, PT-I1..PT-I4. ",
+  "fields": {
+   "Depends on": "`T01.7.3`, `T01.5.4`",
+   "Complexity": "L",
+   "Deliverable": "Pattern type",
+   "Blocks": "`T01.7.5`, `T05.1.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Minimum two distinct constituents enforced",
+   "PT-V2 rejects patterns over versions of one problem",
+   "source_diversity and artefact_assessment required"
+  ]
+ },
+ "T01.7.5": {
+  "line": 1501,
+  "desc": "Realise the Opportunity object type: attributes, O-V1..O-V7, O-I1..O-I4. ",
+  "fields": {
+   "Depends on": "`T01.7.4`",
+   "Complexity": "L",
+   "Deliverable": "Opportunity type",
+   "Blocks": "`T01.7.6`, `T06.2.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "score_model_version required with score",
+   "O-V5 confidence ceiling enforced",
+   "Object cannot reach ACTIVE while scoring undefined (documented)"
+  ]
+ },
+ "T01.7.6": {
+  "line": 1519,
+  "desc": "Realise the Solution object type including structured assumptions and S-V1..S-V6. ",
+  "fields": {
+   "Depends on": "`T01.7.5`",
+   "Complexity": "L",
+   "Deliverable": "Solution type",
+   "Blocks": "`T01.7.7`, `T07.2.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "assumptions non-empty enforced (S-V2)",
+   "Each assumption has criticality and testability",
+   "candidate_group supports sibling candidates"
+  ]
+ },
+ "T01.7.7": {
+  "line": 1537,
+  "desc": "Realise the Validation object type: attributes, V-V1..V-V6, V-I1..V-I4. ",
+  "fields": {
+   "Depends on": "`T01.7.6`",
+   "Complexity": "L",
+   "Deliverable": "Validation type",
+   "Blocks": "`T01.7.8`, `T07.3.1`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Negative result is ACTIVE, never REJECTED",
+   "tests_claim targets a specific claim, not a whole object",
+   "scope_limitations required"
+  ]
+ },
+ "T01.7.8": {
+  "line": 1555,
+  "desc": "Realise the Execution Record object type: attributes, X-V1..X-V6. Create authority remains unassigned pending C-02. ",
+  "fields": {
+   "Depends on": "`T01.7.7`",
+   "Complexity": "L",
+   "Deliverable": "Execution Record type",
+   "Blocks": "`T01.7.9`, `T08.1.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "Type realised and persistable",
+   "No engine holds create authority yet",
+   "X-V4 requires resolvable stored prediction"
+  ]
+ },
+ "T01.7.9": {
+  "line": 1573,
+  "desc": "Realise the Feedback Record object type: attributes, FR-V1..FR-V6, FR-I1..FR-I4. ",
+  "fields": {
+   "Depends on": "`T01.7.8`",
+   "Complexity": "L",
+   "Deliverable": "Feedback Record type",
+   "Blocks": "`T01.8.1`, `T08.2.2`",
+   "Independent": "Yes"
+  },
+  "ac": [
+   "FR-V6 restricts derivation to Execution Records only",
+   "FR-I2 prevents becoming Evidence",
+   "reversal_procedure required"
+  ]
+ },
+ "T01.8.1": {
+  "line": 1593,
+  "desc": "Verify the P1 exit criteria: objects persistable with enforced references, bidirectional lineage traversal, attribution on every write, structural validity enforced. ",
+  "fields": {
+   "Depends on": "`T01.7.9`, `T01.6.5`, `T01.2.5`, `T01.4.5`",
+   "Complexity": "L",
+   "Deliverable": "P1 exit report",
+   "Blocks": "`T02.1.1`, `T07.1.3`",
+   "Independent": "No \u2014 phase gate"
+  },
+  "ac": [
+   "All nine object types persistable",
+   "Lineage traversable both directions",
+   "No object acceptable without attribution",
+   "Graph rebuild demonstrated"
+  ]
+ }
+}

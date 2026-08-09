@@ -1,0 +1,1 @@
+../docs/decisions/N-22-coverage-model.md

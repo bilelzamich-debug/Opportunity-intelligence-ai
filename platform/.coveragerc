@@ -1,0 +1,13 @@
+[run]
+source = oip
+branch = True
+omit = */__init__.py
+
+[report]
+precision = 1
+fail_under = 95
+show_missing = True
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    raise NotImplementedError

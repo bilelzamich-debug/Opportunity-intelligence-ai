@@ -1,0 +1,1 @@
+docs/architecture/PKP_Intelligence_Object_Model.md
