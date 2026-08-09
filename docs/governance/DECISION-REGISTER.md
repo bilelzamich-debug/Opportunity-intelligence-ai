@@ -23,7 +23,7 @@ This register governs **architectural** decisions: anything affecting the pipeli
 
 Precedence, highest first:
 
-0. **[Platform Constitution](../CONSTITUTION.md)** — supreme
+0. **[Platform Constitution](CONSTITUTION.md)** — supreme
 1. This register (decision records)
 2. Intelligence Object Model — Complete Specification
 3. PKP v2 — Master Reference
@@ -48,14 +48,14 @@ Records are **never deleted**. A superseded record remains in the register with 
 
 | Artefact | Purpose | Established by |
 |---|---|---|
-| [`TEMPLATE.md`](TEMPLATE.md) | Mandatory structure for every decision record — six required fields | `T00.1.3` |
-| [`marker-crosswalk.md`](marker-crosswalk.md) | Canonical marker identifier mapping; authoritative over IOM identifiers | `T00.1.2` |
+| [`DECISION-TEMPLATE.md`](DECISION-TEMPLATE.md) | Mandatory structure for every decision record — six required fields | `T00.1.3` |
+| [`marker-crosswalk.md`](../markers/marker-crosswalk.md) | Canonical marker identifier mapping; authoritative over IOM identifiers | `T00.1.2` |
 | [`RATIFICATION-ANNOTATIONS.md`](RATIFICATION-ANNOTATIONS.md) | How ratified decisions modify interpretation of frozen documents | F00.2 |
 | [`DEPENDENCY-MAP.md`](DEPENDENCY-MAP.md) | Decision dependency graph — depends on / enables / blocks / supersedes / related | F00.3 |
 | [`NON-GOALS.md`](NON-GOALS.md) | Platform exclusion register (X1–X9) with anticipated scope-creep pressure | F00.3 |
 | [`TIMELINE.md`](TIMELINE.md) | Chronological narrative: what triggered each decision and what changed after | F00.4 |
-| [`../AGENT-PLAYBOOK.md`](../AGENT-PLAYBOOK.md) | Execution manual for any implementation agent | F00.6 |
-| [`reviews/`](reviews) | Architecture Decision Reviews for escalations | Directed |
+| [`AGENT-PLAYBOOK.md`](AGENT-PLAYBOOK.md) | Execution manual for any implementation agent | F00.6 |
+| [`reviews/`](../reviews/) | Architecture Decision Reviews for escalations | Directed |
 
 **All records must conform to `TEMPLATE.md`. All marker references must use canonical identifiers per `marker-crosswalk.md`.**
 
@@ -74,47 +74,47 @@ Identifiers are permanent and never reused.
 
 | ID | Title | Status | Owner | Date | Record |
 |---|---|---|---|---|---|
-| **AD-01** | Evidence-First | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-01](AD-01-evidence-first.md) |
-| **AD-02** | Intelligence Contracts | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-02](AD-02-intelligence-contracts.md) |
-| **AD-03** | Feedback Loop | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-03](AD-03-feedback-loop.md) |
-| **AD-04** | Separation of Concerns | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-04](AD-04-separation-of-concerns.md) |
-| **AD-05** | **Ground Truth Protection Principle** | `RATIFIED` | Platform Architecture | 2026-08-02 | [AD-05](AD-05-ground-truth-protection.md) |
-| **R-1** | Ratify D-01: immutable versioned objects | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-01](R-01-immutable-versioned-objects.md) |
-| **R-2** | Ratify D-02: seven-state lifecycle | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-02](R-02-object-lifecycle.md) |
-| **R-3** | Ratify D-03: two-component confidence | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-03](R-03-confidence-model.md) |
-| **R-4** | Ratify D-04: temporal validity | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-04](R-04-temporal-validity.md) |
-| **R-5** | Ratify D-05: canonical claims | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-05](R-05-canonical-claims.md) |
-| **R-6** | Ratify D-06: relationship taxonomy | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-06](R-06-relationship-taxonomy.md) |
-| **R-7** | Ratify D-07: Feedback Record (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-07](R-07-feedback-record.md) |
-| **R-8** | Ratify D-08 + C-04 closure (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-08](R-08-behavioural-loop-closure.md) |
-| **N-1** | Platform boundary: advisory with handoff | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-1](N-01-platform-boundary.md) |
-| **N-2** | Human gates at three transitions | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-2](N-02-human-gates.md) |
-| **N-3** | Success measures | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-3](N-03-success-criteria.md) |
-| **N-4** | Determinism posture | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-4](N-04-determinism.md) |
-| **N-5** | Tenancy discriminator | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-5](N-05-tenancy.md) |
-| **N-6** | Store/Graph boundary and consistency | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-6](N-06-store-graph-boundary.md) |
-| **N-7** | Configuration referent + CI-1 isolation (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-7](N-07-configuration-referent.md) |
-| **N-8** | Acceptance authority | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-8](N-08-acceptance-authority.md) |
-| **N-9** | Cascade invalidation owner | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-9](N-09-cascade-invalidation.md) |
-| **N-10** | Failure representation | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-10](N-10-failure-representation.md) |
-| **N-11** | Concurrency model | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-11](N-11-concurrency.md) |
-| **N-12** | Retention policy | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-12](N-12-retention.md) |
-| **N-13** | Explanation skeleton | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-13](N-13-explanation-skeleton.md) |
-| **N-14** | Cross-stage read access | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-14](N-14-cross-stage-read-access.md) |
-| **N-15** | Evidence storage: hybrid | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-15](N-15-evidence-storage.md) |
-| **S-1** | Confidence calibration rubric | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-1](S-01-calibration-rubric.md) |
-| **S-2** | Evidential support function | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-2](S-02-evidential-support-function.md) |
-| **S-3** | Claim decomposition and Fact equivalence | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-3](S-03-claim-equivalence.md) |
-| **S-4** | Evidence sufficiency thresholds | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-4](S-04-sufficiency-thresholds.md) |
-| **S-5** | Extraction fidelity verification | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-5](S-05-extraction-fidelity.md) |
-| **N-16** | Source diversity propagation | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-16](N-16-source-diversity-propagation.md) |
-| **N-17** | Orchestration control model | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-17](N-17-orchestration-control-model.md) |
-| **N-18** | Orchestration phased into P1 (C-08) | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-18](N-18-orchestration-phasing.md) |
-| **N-19** | Experiment Registry placement | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-19](N-19-experiment-registry-placement.md) |
-| **N-20** | Source model: taxonomy, eligibility, non-scoring trust (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-20](N-20-source-model.md) |
-| **N-21** | Acquisition rights: per-source assessment, enforced pre-acquisition (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-21](N-21-acquisition-rights.md) |
-| **N-22** | Coverage model: source-type coverage with explicit gap declaration | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-22](N-22-coverage-model.md) |
-| **N-23** | Research trigger: directive-scoped acquisition within scheduled cycles | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-23](N-23-research-trigger.md) |
+| **AD-01** | Evidence-First | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-01](../decisions/AD-01-evidence-first.md) |
+| **AD-02** | Intelligence Contracts | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-02](../decisions/AD-02-intelligence-contracts.md) |
+| **AD-03** | Feedback Loop | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-03](../decisions/AD-03-feedback-loop.md) |
+| **AD-04** | Separation of Concerns | `RECONSTRUCTED` | Platform Architecture | 2026-08-02 | [AD-04](../decisions/AD-04-separation-of-concerns.md) |
+| **AD-05** | **Ground Truth Protection Principle** | `RATIFIED` | Platform Architecture | 2026-08-02 | [AD-05](../decisions/AD-05-ground-truth-protection.md) |
+| **R-1** | Ratify D-01: immutable versioned objects | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-01](../decisions/R-01-immutable-versioned-objects.md) |
+| **R-2** | Ratify D-02: seven-state lifecycle | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-02](../decisions/R-02-object-lifecycle.md) |
+| **R-3** | Ratify D-03: two-component confidence | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-03](../decisions/R-03-confidence-model.md) |
+| **R-4** | Ratify D-04: temporal validity | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-04](../decisions/R-04-temporal-validity.md) |
+| **R-5** | Ratify D-05: canonical claims | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-05](../decisions/R-05-canonical-claims.md) |
+| **R-6** | Ratify D-06: relationship taxonomy | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-06](../decisions/R-06-relationship-taxonomy.md) |
+| **R-7** | Ratify D-07: Feedback Record (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-07](../decisions/R-07-feedback-record.md) |
+| **R-8** | Ratify D-08 + C-04 closure (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-02 | [R-08](../decisions/R-08-behavioural-loop-closure.md) |
+| **N-1** | Platform boundary: advisory with handoff | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-1](../decisions/N-01-platform-boundary.md) |
+| **N-2** | Human gates at three transitions | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-2](../decisions/N-02-human-gates.md) |
+| **N-3** | Success measures | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-3](../decisions/N-03-success-criteria.md) |
+| **N-4** | Determinism posture | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-4](../decisions/N-04-determinism.md) |
+| **N-5** | Tenancy discriminator | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-5](../decisions/N-05-tenancy.md) |
+| **N-6** | Store/Graph boundary and consistency | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-6](../decisions/N-06-store-graph-boundary.md) |
+| **N-7** | Configuration referent + CI-1 isolation (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-7](../decisions/N-07-configuration-referent.md) |
+| **N-8** | Acceptance authority | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-8](../decisions/N-08-acceptance-authority.md) |
+| **N-9** | Cascade invalidation owner | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-9](../decisions/N-09-cascade-invalidation.md) |
+| **N-10** | Failure representation | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-10](../decisions/N-10-failure-representation.md) |
+| **N-11** | Concurrency model | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-11](../decisions/N-11-concurrency.md) |
+| **N-12** | Retention policy | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-12](../decisions/N-12-retention.md) |
+| **N-13** | Explanation skeleton | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-13](../decisions/N-13-explanation-skeleton.md) |
+| **N-14** | Cross-stage read access | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-14](../decisions/N-14-cross-stage-read-access.md) |
+| **N-15** | Evidence storage: hybrid | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-15](../decisions/N-15-evidence-storage.md) |
+| **S-1** | Confidence calibration rubric | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-1](../decisions/S-01-calibration-rubric.md) |
+| **S-2** | Evidential support function | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-2](../decisions/S-02-evidential-support-function.md) |
+| **S-3** | Claim decomposition and Fact equivalence | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-3](../decisions/S-03-claim-equivalence.md) |
+| **S-4** | Evidence sufficiency thresholds | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-4](../decisions/S-04-sufficiency-thresholds.md) |
+| **S-5** | Extraction fidelity verification | `RATIFIED` | Platform Architecture | 2026-08-02 | [S-5](../decisions/S-05-extraction-fidelity.md) |
+| **N-16** | Source diversity propagation | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-16](../decisions/N-16-source-diversity-propagation.md) |
+| **N-17** | Orchestration control model | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-17](../decisions/N-17-orchestration-control-model.md) |
+| **N-18** | Orchestration phased into P1 (C-08) | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-18](../decisions/N-18-orchestration-phasing.md) |
+| **N-19** | Experiment Registry placement | `RATIFIED` | Platform Architecture | 2026-08-02 | [N-19](../decisions/N-19-experiment-registry-placement.md) |
+| **N-20** | Source model: taxonomy, eligibility, non-scoring trust (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-20](../decisions/N-20-source-model.md) |
+| **N-21** | Acquisition rights: per-source assessment, enforced pre-acquisition (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-21](../decisions/N-21-acquisition-rights.md) |
+| **N-22** | Coverage model: source-type coverage with explicit gap declaration | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-22](../decisions/N-22-coverage-model.md) |
+| **N-23** | Research trigger: directive-scoped acquisition within scheduled cycles | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-23](../decisions/N-23-research-trigger.md) |
 
 **Ratified: 37 · Reconstructed: 4 · Draft: 0 · Total: 41**
 

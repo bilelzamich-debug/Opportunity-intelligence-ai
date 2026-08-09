@@ -3,7 +3,7 @@
 **These documents are frozen. They must never be edited in place.**
 
 Where a ratified decision changes how one of these should be read, the change
-is recorded in [`../../decisions/records/RATIFICATION-ANNOTATIONS.md`](../../decisions/records/RATIFICATION-ANNOTATIONS.md),
+is recorded in [`../governance/RATIFICATION-ANNOTATIONS.md`](../governance/RATIFICATION-ANNOTATIONS.md),
 which is authoritative over the text it annotates.
 
 Rewriting a frozen document is **Playbook F5** — forbidden.
@@ -31,7 +31,7 @@ If you are new, read in this order:
 3. **`PKP_v2_Master_Reference.md` §11–§13** — what is missing from it. This is
    the most important part of the corpus.
 4. **`PKP_Intelligence_Object_Model.md` §1–§3** — the object contract.
-5. **`../../decisions/records/`** — what has since been decided.
+5. **`../decisions/`** — what has since been decided.
 
 ---
 
@@ -44,7 +44,7 @@ PKP v2 §13. The *substance* of every IOM statement is sound; the *identifiers*
 are unreliable.
 
 **Ten collisions exist.** Always resolve through
-[`../../decisions/records/marker-crosswalk.md`](../../decisions/records/marker-crosswalk.md)
+[`../markers/marker-crosswalk.md`](../markers/marker-crosswalk.md)
 before citing any marker seen in the IOM. Four of the most dangerous:
 
 | IOM cites | IOM means | Canonical | v2's own meaning for that number |

@@ -4,7 +4,7 @@ Nothing in this directory is binding. These are working artefacts retained
 because they show *how* the ratified decisions were reached — and, in two
 cases, what was rejected.
 
-The authoritative records are in [`../records/`](../records/).
+The authoritative records are in [`../decisions/`](../decisions/).
 
 ---
 
@@ -13,9 +13,9 @@ The authoritative records are in [`../records/`](../records/).
 | File | Type | Outcome |
 |---|---|---|
 | [`PROPOSAL-M-16-source-model.md`](PROPOSAL-M-16-source-model.md) | Architecture Decision Proposal | **Superseded** by N-20 |
-| [`ARB-REVIEW-M-16.md`](ARB-REVIEW-M-16.md) | Architecture Review Board | Recommended **split M-16** |
-| [`ARB-REVIEW-P2-DECISION-SET.md`](ARB-REVIEW-P2-DECISION-SET.md) | System-level review of N-20…N-23 | **CONDITIONALLY COHERENT** — 5 defects found |
-| [`REVISION-2-REPORT.md`](REVISION-2-REPORT.md) | Amendment record | Resolved C-1…C-5 |
+| [`ARB-REVIEW-M-16.md`](../reviews/ARB-REVIEW-M-16.md) | Architecture Review Board | Recommended **split M-16** |
+| [`ARB-REVIEW-P2-DECISION-SET.md`](../reviews/ARB-REVIEW-P2-DECISION-SET.md) | System-level review of N-20…N-23 | **CONDITIONALLY COHERENT** — 5 defects found |
+| [`REVISION-2-REPORT.md`](../reviews/REVISION-2-REPORT.md) | Amendment record | Resolved C-1…C-5 |
 
 ---
 

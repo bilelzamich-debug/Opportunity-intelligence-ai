@@ -144,7 +144,7 @@ equality on engine output (Playbook **F11**).
 `S-01-calibration-rubric.md`** — a genuine specification-to-code cross-check.
 
 It resolves the record at `<repo>/decisions/<ID>.md`. Because this repository
-groups records under `decisions/records/`, the historical paths are preserved
+groups records under `docs/decisions/`, the historical paths are preserved
 by symlinks rather than by editing a frozen Phase-1 test.
 
 This was caught by running the suite in the copied tree: **1 failure that did

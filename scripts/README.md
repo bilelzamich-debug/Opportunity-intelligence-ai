@@ -68,7 +68,7 @@ paths:
 |---|---|---|
 | `/PKP_*.md`, `/CONSTITUTION.md`, `/AGENT-PLAYBOOK.md`, `/P1-EXECUTION-PLAN.md` | `docs/…` | 8 verifiers resolve frozen docs at the repo root |
 | `/uploads/PKP_v1_Foundation.txt` | `docs/architecture/…` | Same |
-| `/decisions/<ID>.md` (47) | `records/<ID>.md` | `test_calibration.py` reads `S-01-calibration-rubric.md` verbatim to check the rubric against its spec |
+| `/decisions/<ID>.md` (47) | `docs/decisions/<ID>.md` | `test_calibration.py` reads `S-01-calibration-rubric.md` verbatim to check the rubric against its spec |
 
 **These exist because reorganising the tree broke real checks.** Both breakages
 were caught by running the battery in the copied tree — 1 test failure and 10
