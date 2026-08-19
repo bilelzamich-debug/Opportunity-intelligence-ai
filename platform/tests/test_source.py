@@ -3,8 +3,10 @@
 Task: T02.1.1
 
 Architecture References:
-- M-16   Source taxonomy / eligibility / trust. OPEN. The tests below assert
-         that the gap stays OPEN and is surfaced, not that it is filled.
+- N-20   Source model (RATIFIED 2026-08-04): taxonomy S 5.1 (the eight
+         members below are its table verbatim), eligibility-as-typability
+         S 5.2, trust representation S 5.3. The M-16 scoring half stays
+         OPEN and is still surfaced by these tests.
 - S-02   evidential_support has five exhaustive inputs; trust is not one.
 - N-16   Independence assessed on grouping key, falling back to identifier.
 - N-04   Historical reads reproduce: append-only, versioned.
@@ -12,7 +14,7 @@ Architecture References:
 - N-4    Property-based assertions only; never equality on engine output.
 
 T02.1.1 acceptance criteria under test:
-  AC1  source_type drawn from a closed taxonomy   -> structure only; FAILS CLOSED
+  AC1  source_type drawn from a closed taxonomy   -> IMPLEMENTED from N-20 S 5.1
   AC2  per-source trust rating stored             -> IMPLEMENTED
   AC3  trust is a learnable target for P8         -> NOT IMPLEMENTABLE (M-02/M-43)
 """
@@ -42,9 +44,9 @@ from oip.source import (
     SourceRecord,
     SourceRegistry,
     SourceType,
-    TaxonomyNotRatifiedError,
     TrustNotRatifiedError,
     TrustRating,
+    UntypableChannelError,
     affects_evidential_support,
     assess_eligibility,
     classify,
@@ -56,6 +58,18 @@ from oip.source import (
 )
 
 TRUST = st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False)
+
+# The N-20 S 5.1 closed set, in ratified table order. [AC1]
+TAXONOMY_NAMES: tuple[str, ...] = (
+    "PUBLISHED_EDITORIAL",
+    "MARKETPLACE_LISTING",
+    "USER_GENERATED_REVIEW",
+    "USER_GENERATED_DISCUSSION",
+    "SUPPORT_INTERACTION",
+    "STRUCTURED_DATASET",
+    "REGULATORY_FILING",
+    "VENDOR_PUBLICATION",
+)
 IDENT = st.text(min_size=1, max_size=40).filter(lambda s: s.strip())
 
 
@@ -67,46 +81,63 @@ def registry_with(n: int = 3) -> SourceRegistry:
 
 
 # ===========================================================================
-# AC1 -- taxonomy: structurally present, deliberately unpopulated  [M-16]
+# AC1 -- taxonomy: populated exactly from N-20 S 5.1, closed  [N-20]
 # ===========================================================================
 
 
-class TestTaxonomyFailsClosed:
-    def test_taxonomy_is_empty_because_m16_is_open(self):
-        assert taxonomy_members() == ()
-        assert TAXONOMY_RATIFIED is False
+class TestTaxonomyPopulatedFromN20:
+    def test_taxonomy_is_the_eight_members_in_ratified_order(self):
+        assert [m.name for m in taxonomy_members()] == list(TAXONOMY_NAMES)
+        assert len(TAXONOMY_NAMES) == 8
+        assert TAXONOMY_RATIFIED is True
 
-    def test_the_blocking_marker_is_named(self):
+    def test_the_marker_still_names_the_open_scoring_half(self):
         assert TAXONOMY_MARKER == "M-16"
 
-    def test_classify_refuses_rather_than_guessing(self):
-        with pytest.raises(TaxonomyNotRatifiedError) as exc:
-            classify("customer_review_corpus")
-        assert "M-16" in str(exc.value)
+    @given(candidate=st.sampled_from(TAXONOMY_NAMES))
+    def test_classify_maps_every_ratified_member(self, candidate):
+        """Property: each ratified name classifies to its own member."""
+        assert classify(candidate) is SourceType[candidate]
+
+    @given(candidate=st.text(max_size=30).filter(
+        lambda s: s.strip() and s not in TAXONOMY_NAMES))
+    def test_classify_refuses_everything_else(self, candidate):
+        """Property: nothing outside the closed set classifies. [N-20 S 5.2]"""
+        with pytest.raises(UntypableChannelError) as exc:
+            classify(candidate)
+        assert "UNTYPABLE_CHANNEL" in str(exc.value)
+
+    def test_classify_rejects_non_strings_and_empty(self):
+        for bad in (None, 0, [], object(), "", "   "):
+            with pytest.raises(SourceError):
+                classify(bad)
 
     @given(candidate=st.text(max_size=30))
-    def test_no_string_is_ever_a_ratified_member(self, candidate):
-        """Property: while M-16 is open, nothing classifies."""
+    def test_no_raw_string_is_ever_a_typed_member(self, candidate):
+        """The typed predicate is for enum values; strings use classify."""
         assert is_ratified_source_type(candidate) is False
 
     def test_membership_predicate_is_total(self):
         """It must never raise -- callers branch without try/except."""
         for candidate in (None, 0, "", [], object(), SourceType):
             assert is_ratified_source_type(candidate) is False
+        assert is_ratified_source_type(SourceType.REGULATORY_FILING) is True
 
-    def test_enum_carries_no_invented_members(self):
-        """The guard against someone quietly populating the vocabulary."""
-        assert list(SourceType) == []
+    def test_enum_carries_exactly_the_eight_ratified_members(self):
+        """The guard against someone quietly extending the vocabulary."""
+        assert list(SourceType) == [SourceType[n] for n in TAXONOMY_NAMES]
+        with pytest.raises(AttributeError):
+            SourceType.CUSTOMER_REVIEW_CORPUS
 
 
 # ===========================================================================
-# AC1 -- per-type eligibility  [M-16]
+# AC1 -- eligibility = typability  [N-20 S 5.2]
 # ===========================================================================
 
 
 class TestEligibilityFailsClosed:
     @given(identifier=IDENT)
-    def test_eligibility_is_never_determined_while_m16_is_open(self, identifier):
+    def test_eligibility_is_never_determined_from_identifier_alone(self, identifier):
         assessment = assess_eligibility(identifier)
         assert assessment.outcome is SourceEligibility.UNDETERMINED
         assert assessment.is_determined is False
@@ -116,13 +147,16 @@ class TestEligibilityFailsClosed:
         """Fails closed: absence of a rule is not permission."""
         assert assess_eligibility(identifier).admits_acquisition is False
 
-    def test_assessment_names_its_blocking_marker(self):
-        assert assess_eligibility("src-a").blocking_marker == "M-16"
+    def test_assessment_carries_no_blocking_marker(self):
+        """No open MARKER blocks eligibility anymore; the untyped channel
+        does (T02.2.1 sequencing), and that is a task, not a marker."""
+        assert assess_eligibility("src-a").blocking_marker is None
 
     def test_require_eligible_refuses(self):
         with pytest.raises(EligibilityNotRatifiedError) as exc:
             require_eligible("src-a")
-        assert "M-16" in str(exc.value)
+        assert "cannot be admitted" in str(exc.value)
+        assert "typability" in str(exc.value)
 
     def test_assessment_does_not_raise(self):
         """Reporting a gap must not force callers into exception handling."""
@@ -358,11 +392,17 @@ class TestIndependence:
         groups = reg.independence_groups()
         assert sum(len(v) for v in groups.values()) == len(reg)
 
-    def test_source_type_diversity_fails_closed(self):
-        """S-02 input 2 needs the taxonomy M-16 has not supplied."""
-        with pytest.raises(TaxonomyNotRatifiedError) as exc:
-            registry_with(3).source_type_diversity()
-        assert "M-16" in str(exc.value)
+    def test_source_type_diversity_counts_classified_members_only(self):
+        """S-02 input 2 counts taxonomy members, never raw strings."""
+        reg = SourceRegistry()
+        reg.register("a", "PUBLISHED_EDITORIAL")
+        reg.register("b", "PUBLISHED_EDITORIAL")
+        reg.register("c", "MARKETPLACE_LISTING")
+        reg.register("d", "not-a-ratified-type")
+        assert reg.source_type_diversity() == 2
+
+    def test_source_type_diversity_is_zero_when_nothing_classifies(self):
+        assert registry_with(3).source_type_diversity() == 0
 
 
 class TestGapReporting:
@@ -375,11 +415,15 @@ class TestGapReporting:
         gaps = SourceRegistry().specification_gaps()
         assert set(gaps.values()) >= {"M-16", "M-02", "M-43", "M-70", "M-18", "S-02"}
 
-    def test_taxonomy_dependent_gaps_point_at_m16(self):
+    def test_n20_closed_gaps_are_gone_and_open_ones_remain(self):
+        """N-20 S 8 closed the taxonomy/eligibility/diversity gaps; the
+        scoring/semantics half of M-16 stays open and reported."""
         gaps = SourceRegistry().specification_gaps()
         for key in ("source_taxonomy", "per_type_eligibility",
                     "source_type_diversity"):
-            assert gaps[key] == "M-16"
+            assert key not in gaps
+        assert gaps["trust_semantics"] == "M-16"
+        assert gaps["trust_banding"] == "M-16"
 
 
 class TestCI1Isolation:
@@ -462,9 +506,12 @@ class TestGuards:
         with pytest.raises(SourceError):
             SourceRecord("s", "raw", "2026-01-01")
 
-    def test_taxonomy_classified_is_false_until_m16(self):
-        record = registry_with(1).resolve("src-0")
-        assert record.taxonomy_classified is False
+    def test_taxonomy_classified_reflects_raw_string_membership(self):
+        reg = SourceRegistry()
+        typed = reg.register("s", "VENDOR_PUBLICATION")
+        untyped = reg.register("t", "raw")
+        assert typed.taxonomy_classified is True
+        assert untyped.taxonomy_classified is False
 
     def test_unknown_trust_version_is_refused(self):
         reg = registry_with(1)

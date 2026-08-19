@@ -167,6 +167,26 @@ The pivotal era. AD-01 versus AD-03 had to be settled before anything could be b
 
 ---
 
+## Era 7 — Phase 2 Opens
+
+### N-20 … N-23 — the P2 decision set (2026-08-04)
+
+| | |
+|---|---|
+| **Trigger** | Phase 1 closed; the Research Engine required a source model, acquisition rights, a coverage model and a research trigger before any acquisition. |
+| **Decision** | Four records ratified together by the Project Owner with recorded reservations (AS-0…AS-5): closed source taxonomy by acquisition channel (N-20), per-source rights assessment enforced pre-acquisition (N-21), source-type coverage with explicit gap declaration (N-22), directive-scoped acquisition within scheduled cycles (N-23). |
+| **What changed** | `source.py` delivered (`T02.1.1` AC1/AC2). Two owner questions were left open: D-1 (N-23 §5.5 reserved both resolution paths to the ratifier) and the rights-authority name (N-21 §10). |
+
+### 2026-08-19 — the owner answers
+
+| | |
+|---|---|
+| **Trigger** | The two reserved questions blocked all of Phase 2's acquisition work: D-1 blocked `T02.2.4` and 22 downstream P7–P8 tasks; the unnamed rights authority kept N-21 inert and every source `UNASSESSED`. |
+| **Decision** | **D-1 → Option N-23 §5.5(i):** `T02.2.4` AC2 amended to *"Targets recorded with their commissioning authority"* — the ratified wording, verbatim. N-2 unchanged; no fourth gate. **`T02.1.3` AC1 → explicit-input model:** `source_independence_group` is carried and honoured when supplied; no syndication/ownership inference without a ratified rule. **N-24 drafted and ratified** naming the rights authority as the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary. |
+| **What changed** | `T02.2.4` and its 22 downstream tasks unblocked; `T02.1.3` closed on existing evidence (registry + provenance grouping, already tested); `T02.1.4` unblocked. N-24 is **RATIFIED** — the authority exists in governance; acquisition stays fail-closed until the role is staffed and supplies assessments (N-21 §6 item 2). Recorded in RATIFICATION-ANNOTATIONS §11. |
+
+---
+
 ## Patterns Across the Timeline
 
 Five things recur, and each is worth carrying forward.

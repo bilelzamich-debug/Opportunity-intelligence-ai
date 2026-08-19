@@ -115,13 +115,21 @@ Identifiers are permanent and never reused.
 | **N-21** | Acquisition rights: per-source assessment, enforced pre-acquisition (🔺 escalation) | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-21](../decisions/N-21-acquisition-rights.md) |
 | **N-22** | Coverage model: source-type coverage with explicit gap declaration | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-22](../decisions/N-22-coverage-model.md) |
 | **N-23** | Research trigger: directive-scoped acquisition within scheduled cycles | `RATIFIED` | Platform Architecture | 2026-08-04 | [N-23](../decisions/N-23-research-trigger.md) |
+| **N-24** | Acquisition-rights authority: designated role, scope limited to N-21 §5.5 vocabulary | `RATIFIED` | Platform Architecture | 2026-08-19 | [N-24](../decisions/N-24-source-rights-authority.md) |
 
-**Ratified: 37 · Reconstructed: 4 · Draft: 0 · Total: 41**
+**Ratified: 38 · Reconstructed: 4 · Draft: 0 · Total: 42**
 
 > **P2 decision set added 2026-08-04.** N-20…N-23 were ratified together by the
 > Project Owner with recorded reservations (AS-0…AS-5, held in each record's
 > *Honest Limitations*). All four close their markers **partially**; none
 > supersedes an existing record.
+
+> **N-24 ratified 2026-08-19.** Names the N-21 §5.1 authority as the
+> role *Designated Source Rights/Compliance Authority*, scope narrowed to the
+> N-21 §5.5 vocabulary; closes N-21 §10 item 2. **N-21 is unchanged and not
+> superseded.** Ratification does not operationalise acquisition — sources
+> remain `UNASSESSED` until the role is staffed and supplies assessments
+> (N-21 §6 item 2).
 
 Phase 0 completes when every row above reaches `RATIFIED` (or `RECONSTRUCTED` for AD-01…AD-04), verified by `T00.7.1`.
 

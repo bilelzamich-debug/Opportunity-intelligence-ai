@@ -1763,8 +1763,16 @@ Implement research directive intake: scheduled batch, directive-driven targets (
 **Acceptance criteria**
 
 - Directives scope acquisition
-- Targets proposed for approval per human-gate decision
+- Targets recorded with their commissioning authority
 - Out-of-scope acquisition rejected
+
+> **AC2 amended 2026-08-19 — D-1 resolved, Option N-23 §5.5(i).**
+> The original wording ("Targets proposed for approval per human-gate
+> decision") conflicted with N-2's exactly-three-gates model and was
+> unsatisfiable under Article XI. The Project Owner selected the amendment
+> path pre-specified in N-23 §5.5(i); the replacement text above is that
+> ratified wording verbatim. N-2 stands unchanged; no fourth gate is created.
+> Recorded in `docs/governance/RATIFICATION-ANNOTATIONS.md` §11.
 
 #### `T02.2.5`
 
@@ -3520,6 +3528,26 @@ Remediate C-07: document completed research to the platform's own evidence stand
 
 - Findings, method and provenance recorded
 - Project documentation consistent with Principles 1 and 3
+
+#### `T09.3.2`
+
+Confirm IOM closures (B-73 to B-81) against ratified decisions.
+
+| | |
+|---|---|
+| **Depends on** | `T00.7.1` |
+| **Complexity** | M |
+| **Deliverable** | Closure confirmation report |
+| **Blocks** | — (nothing) |
+| **Independent** | Yes |
+
+**Acceptance criteria**
+
+- Each closure verified against its decision record
+- No marker closed by implementation choice
+
+---
+mentation consistent with Principles 1 and 3
 
 #### `T09.3.2`
 

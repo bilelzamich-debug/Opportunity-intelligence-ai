@@ -42,7 +42,7 @@ python -c "import hypothesis, pytest_cov" 2>/dev/null \
 cd "$PLATFORM"
 
 hdr "Test suites"
-chk "unit suite (expect 3201 passed)" "3201 passed" \
+chk "unit suite (expect 3204 passed)" "3204 passed" \
     python -m pytest -q
 if (( FULL )); then
   chk "stress suite (expect 128 passed, ~17 min)" "128 passed" \

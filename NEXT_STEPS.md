@@ -1,27 +1,39 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-08-04**, after ratification of N-20…N-23.
+Current as of **2026-08-19** — D-1 resolved, `T02.1.3` closed, N-24 ratified.
+Prior state: 2026-08-04 (ratification of N-20…N-23).
 
 ---
 
 ## 1. The Short Version
 
-Two decisions are required from the **Project Owner**. Neither can be resolved
-by analysis, implementation or further review — both have been investigated to
-exhaustion already.
+Both decisions required from the **Project Owner** are now taken:
 
-| # | Decision required | Unblocks |
+| # | Decision | Status |
 |---|---|---|
-| **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | `T02.2.4` + 22 downstream P7–P8 tasks |
-| **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | All actual acquisition; makes N-21 operational |
+| **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
+| **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-Until decision 2 is taken, the platform **cannot acquire a single source**, and
-therefore cannot complete Phase 2 regardless of how much code is written.
+**What is executable now:** `T02.1.4` (coverage model, unblocked by
+`T02.1.3`'s closure) and `T02.1.2` (**implementable** — N-24 ratified;
+operational only when the role supplies assessments). Both await
+authorisation per project workflow. ~~`T02.1.1` AC1/AC2~~ — ✅ done
+2026-08-19: `SourceType` populated exactly from N-20 §5.1.
 
 ---
 
-## 2. Decision 1 — D-1: The Missing Human Gate
+## 2. Decision 1 — D-1: The Missing Human Gate — ✅ RESOLVED
+
+> **Resolution (2026-08-19).** The Project Owner selected **Option A** —
+> amend `T02.2.4` AC2 using the exact wording pre-specified by N-23 §5.5(i):
+> *"Targets recorded with their commissioning authority."* No fourth gate;
+> N-2 stands unamended; commissioning remains a pre-platform act the platform
+> records but never adjudicates. Recorded in
+> `docs/governance/RATIFICATION-ANNOTATIONS.md` §11. `T02.2.4` and its 22
+> downstream P7–P8 tasks are unblocked.
+
+The original conflict analysis is retained below for the record.
 
 ### The conflict
 
@@ -46,7 +58,7 @@ architecture but leaves the backlog AC unmet.
 
 ### The two options
 
-**Option A — Amend `T02.2.4` AC2.**
+**Option A — Amend `T02.2.4` AC2.** ✅ **SELECTED 2026-08-19.**
 Reword to something like *"targets recorded with their commissioning
 authority"*. No gate is created; N-2 stands unamended; the backlog aligns with
 the ratified architecture.
@@ -73,7 +85,16 @@ one has yet made. **This is your call, not the board's.**
 
 ---
 
-## 3. Decision 2 — Name the Rights Authority
+## 3. Decision 2 — Name the Rights Authority — ✅ RATIFIED AS N-24 (2026-08-19)
+
+> **Status (2026-08-19).** N-24 is **RATIFIED**. The authority is the
+> **role** *Designated Source Rights/Compliance Authority* — a role, not an
+> individual. Scope is deliberately narrow, exactly as audited: limited to
+> issuing acquisition-rights and retention-rights assessments in the closed
+> vocabulary of N-21 §5.5, with no broader compliance powers. **Sources
+> remain `UNASSESSED` and acquisition remains fail-closed until the role is
+> staffed and supplies assessments** (N-21 §6 item 2); `T02.1.2` is
+> implementable, not operational.
 
 N-21 §5.1 states:
 
@@ -107,36 +128,38 @@ precondition to Phase 2 completion, not a detail.
 
 ## 4. Once Unblocked — Phase 2 Execution Order
 
-Assuming both decisions are taken, work proceeds in this order. Dependencies
-are the *real* ones, verified against the ratified corpus, not merely the
-backlog's declared edges.
+Both decisions are taken (D-1 resolved; N-24 ratified).
+Work proceeds in this order. Dependencies are the *real* ones, verified
+against the ratified corpus, not merely the backlog's declared edges.
 
 | # | Task | Status now | Notes |
 |---|---|---|---|
-| 1 | `T02.1.3` Independence grouping | 🟢 **Ready today** | Needs no ratification; N-16/S-4 fully specify it. The one genuinely available task |
-| 2 | `T02.1.1` complete AC1/AC2 | 🟡 Partial | `source.py` exists; taxonomy now ratified, so the empty enum can be populated from N-20 §5.1. **AC3 stays blocked** on M-02/M-43 |
-| 3 | `T02.1.2` Licensing enforcement | 🟢 Unblocked | Requires decision 2 to be operational |
-| 4 | `T02.1.4` Coverage model | 🟢 Unblocked | N-22 in force; needs N-20's taxonomy, which now exists |
+| 1 | `T02.1.3` Independence grouping | ✅ **CLOSED 2026-08-19** | Explicit-input model ratified; existing code + tests are the evidence. Its dependent `T02.1.4` is unblocked |
+| 2 | `T02.1.1` complete AC1/AC2 | ✅ **DONE 2026-08-19** | `SourceType` populated exactly from N-20 §5.1; the verifier matches the enum to the decision table mechanically (38/38; mutation 21/21). **AC3 stays blocked** on M-02/M-43 |
+| 3 | `T02.1.4` Coverage model | 🟢 Unblocked | N-22 in force; needs N-20's taxonomy, which now exists; `T02.1.3` (its dependency) is closed |
+| 4 | `T02.1.2` Licensing enforcement | 🟢 **Implementable** | N-24 ratified; operational only when the role supplies assessments |
 | 5 | `T02.2.1` Acquisition | 🟡 Sequenced | Depends on `T02.1.2` |
 | 6 | `T02.2.2` Duplicate detection | 🟡 Sequenced | E-V6 already implemented in P1; needs acquired Evidence |
 | 7 | `T02.2.3` Drift detection | 🟡 Sequenced | Specification complete (N-15 binds it) |
 | 8 | `T02.2.5` Failure recording | 🟡 Sequenced | Specification complete (N-10) |
-| 9 | `T02.2.4` Directive intake | 🔴 Blocked | **Requires decision 1** |
-| 10 | `T02.3.1` P2 exit gate | 🔴 Blocked | Requires all of the above |
+| 9 | `T02.2.4` Directive intake | 🟡 **Unblocked 2026-08-19** | D-1 resolved (N-23 §5.5(i)); sequenced behind `T02.2.1`, `T01.6.1` |
+| 10 | `T02.3.1` P2 exit gate | 🔴 Blocked | Requires all of the above + operational acquisition |
 
-### The one task available right now
+### The tasks available right now
 
-**`T02.1.3` — source independence grouping.** Verified during the Phase 2
-dependency reconstruction: its declared dependency on `T02.1.1` is a *backlog
-ordering statement*, not a specification dependency. Neither of its acceptance
-criteria references `source_type`, trust or eligibility. N-16 and S-4 fully
-specify the behaviour, and `Provenance.independence_key` already exists in P1.
+**`T02.1.1` AC1/AC2 — populate `SourceType` from N-20 §5.1.** The eight
+members are ratified; the enum is empty by design awaiting exactly this act.
+No new decision is required — NEXT_STEPS §7 explicitly sanctions populating
+from N-20 §5.1 and from nothing else.
 
-**One caveat**, recorded honestly: AC1 says `source_independence_group`
-"populated". Under the reading *"the attribute is carried and honoured when
-supplied"* it is implementable today. Under the reading *"the engine **detects**
-syndication and assigns groups"* it is **not** — no ratified source defines a
-detection rule. That ambiguity needs a one-line answer before starting.
+**`T02.1.4` — coverage model.** Unblocked by `T02.1.3`'s closure; N-22 fully
+specifies it.
+
+Both await Project Owner authorisation per project workflow. **The
+`T02.1.3` AC1 ambiguity is resolved**: the Project Owner selected the
+explicit-input model (2026-08-19) — `source_independence_group` is carried and
+honoured when supplied, and **no syndication/ownership inference is performed
+without a ratified rule**. Recorded in RATIFICATION-ANNOTATIONS §11.
 
 ---
 
@@ -188,10 +211,17 @@ Recorded because each is a live temptation and each would breach governance:
 
 ## 8. Recommended Immediate Action
 
-1. **Answer decision 1** (D-1) — one sentence resolves it.
-2. **Answer decision 2** (rights authority) — one name resolves it.
-3. **Clarify `T02.1.3` AC1** — carried-vs-detected (§4 above).
-4. Then authorise `T02.1.3`, the only task executable today.
+Status 2026-08-19:
 
-Steps 1–3 are minutes of decision-making that unblock weeks of work. Step 4 can
-begin immediately after.
+1. ~~**Answer decision 1** (D-1)~~ — ✅ answered: Option A, N-23 §5.5(i).
+2. ~~**Ratify N-24**~~ — ✅ **ratified 2026-08-19** (scope exactly as
+   audited). Next organisational step: staff the role and supply
+   assessments; until then acquisition stays fail-closed.
+3. ~~**Clarify `T02.1.3` AC1`**~~ — ✅ answered: explicit-input model.
+4. ~~**Authorise `T02.1.3`**~~ — ✅ closed 2026-08-19 on existing evidence.
+5. ~~**Authorise `T02.1.1` AC1/AC2`**~~ — ✅ done 2026-08-19: `SourceType`
+   populated from N-20 §5.1 verbatim; suite 3,204; source-model verifier
+   38/38; mutation 21/21.
+
+Item 2 is minutes of decision-making that unblocks all acquisition work.
+Item 5 can begin immediately on authorisation.

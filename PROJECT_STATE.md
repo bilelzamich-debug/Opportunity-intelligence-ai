@@ -1,7 +1,8 @@
 # Project State
 
 **Authoritative statement of where the Opportunity Intelligence Platform stands.**
-Last updated: **2026-08-04**, immediately after ratification of N-20…N-23.
+Last updated: **2026-08-19** — D-1 resolved (N-23 §5.5(i)), `T02.1.3` closed,
+N-24 ratified. Prior update: 2026-08-04 (ratification of N-20…N-23).
 
 Every figure in this document was verified by execution or extraction, not
 recalled. Where a number could not be verified, that is stated.
@@ -14,7 +15,7 @@ recalled. Where a number could not be verified, that is stated.
 |---|---|---|---|
 | **P0** | Specification | ✅ **CLOSED** | 37 decisions ratified; `T00.7.1` exit gate passed |
 | **P1** | Foundation | ✅ **CLOSED** 2026-08-04 | 44/44 tasks, 134/134 acceptance criteria, 60/60 closure checks |
-| **P2** | Research Engine | 🟡 **IN PROGRESS** | 4 decisions ratified; `T02.1.1` partially delivered; 9 tasks blocked |
+| **P2** | Research Engine | 🟡 **IN PROGRESS** | 5 decisions ratified (N-24 latest, 2026-08-19); `T02.1.3` closed; `T02.2.4` unblocked (D-1 resolved); acquisition awaits role-supplied assessments |
 | **P3** | Fact Extraction | ⬜ Not started | Blocked at `T03.1.1` by the P2 exit gate |
 | **P4** | Problem Intelligence | ⬜ Not started | — |
 | **P5** | Pattern Intelligence | ⬜ Not started | — |
@@ -23,7 +24,7 @@ recalled. Where a number could not be verified, that is stated.
 | **P8** | Feedback | ⬜ Not started | — |
 | **P9** | Hardening | ⬜ Not started | — |
 
-## 2. Decision Register — 41 Records
+## 2. Decision Register — 42 Records
 
 | Series | Count | Status |
 |---|---|---|
@@ -32,8 +33,9 @@ recalled. Where a number could not be verified, that is stated.
 | `R-1` … `R-8` | 8 | `RATIFIED` — IOM decisions D-01…D-08 |
 | `N-1` … `N-19` | 19 | `RATIFIED` — scope, boundary, control |
 | `N-20` … `N-23` | 4 | `RATIFIED` **2026-08-04** — the P2 decision set |
+| `N-24` | 1 | `RATIFIED` **2026-08-19** — acquisition-rights authority (role) |
 | `S-1` … `S-5` | 5 | `RATIFIED` — semantics |
-| **Total** | **41** | 37 ratified + 4 reconstructed |
+| **Total** | **42** | 38 ratified + 4 reconstructed |
 
 ### 2.1 The P2 Decision Set (ratified 2026-08-04)
 
@@ -54,12 +56,12 @@ supersessions.** No frozen document was rewritten.
 | Metric | Value | How verified |
 |---|---|---|
 | Production modules | **29** | `ls oip/*.py \| wc -l` |
-| Production lines | **18,418** | `wc -l oip/*.py` |
+| Production lines | **18,498** | `wc -l oip/*.py` |
 | Test files | **37** | `ls tests/*.py \| wc -l` |
-| Unit tests | **3,201 passing** | `pytest -q` |
+| Unit tests | **3,204 passing** | `pytest -q` |
 | Stress tests | **128 passing** | `pytest -q -m stress` |
-| **Total tests** | **3,329 passing, 0 failing** | both suites |
-| Total coverage | **99.04%** | `pytest --cov=oip` |
+| **Total tests** | **3,332 passing, 0 failing** | both suites |
+| Total coverage | **99.0%** | `pytest --cov=oip` |
 | Modules below 95% | **0** | mechanical per-module check |
 | Architecture verifiers | **443 checks passing** | 8 verifier scripts |
 | Mutation score (cascade) | 19/20 killed, 1 proven equivalent | `mutate_t01_2_4_r1.py` |
@@ -99,7 +101,7 @@ supersessions.** No frozen document was rewritten.
 | **M-16** | 🟡 Partially closed | Taxonomy, eligibility, trust representation | Trust **scoring** (needs S-2 superseded); learnability (M-02/M-43) |
 | **M-17** | 🟡 Partially closed | Coverage + completeness concepts | **Stopping** — "researched enough" → M-01 |
 | **M-18** | 🟡 Partially closed | Rights half: legality, licensing, ToU, retention rights | **M-18b** conduct half; v2 §14 "compliance" scope |
-| **M-01** | 🟡 Partially closed | Initiation, originators, lifecycle, scoping, cancellation | Self-direction; target approval (D-1) |
+| **M-01** | 🟡 Partially closed | Initiation, originators, lifecycle, scoping, cancellation; target approval (**D-1 resolved 2026-08-19**, N-23 §5.5(i)) | Self-direction (D-2, no canonical ID) |
 
 ### 4.2 Reserved Identifier
 
@@ -133,14 +135,14 @@ These were adopted as **choices**, not derivations, and are now in force.
 
 | Task | Status | Blocker |
 |---|---|---|
-| `T02.1.1` Source model | 🟡 **PARTIAL** — AC1 ✅ AC2 ✅ **AC3 ❌** | M-02 / M-43 (learnability) |
-| `T02.1.2` Licensing & access policy | 🟢 Unblocked, **inert** | Rights authority unnamed |
-| `T02.1.3` Independence grouping | 🟢 Unblocked | — |
+| `T02.1.1` Source model | 🟡 **PARTIAL** — AC1 ✅ **(enum populated from N-20 §5.1, 2026-08-19)** AC2 ✅ **AC3 ❌** | M-02 / M-43 (learnability) |
+| `T02.1.2` Licensing & access policy | 🟢 **IMPLEMENTABLE, not operational** | N-24 ratified 2026-08-19; acquisition requires role-supplied assessments |
+| `T02.1.3` Independence grouping | ✅ **CLOSED 2026-08-19** — explicit-input model; existing code + tests are the evidence | — |
 | `T02.1.4` Coverage model | 🟢 Unblocked | — |
 | `T02.2.1` Acquisition | 🟡 Sequenced behind `T02.1.2` | — |
 | `T02.2.2` Duplicate detection | 🟡 Sequenced behind `T02.2.1` | — |
 | `T02.2.3` Drift detection | 🟡 Sequenced behind `T02.2.2` | — |
-| `T02.2.4` Directive intake | 🔴 **BLOCKED** | **D-1** |
+| `T02.2.4` Directive intake | 🟡 **UNBLOCKED 2026-08-19** (D-1 resolved, N-23 §5.5(i)) | Sequenced behind `T02.2.1`, `T01.6.1` |
 | `T02.2.5` Failure recording | 🟡 Sequenced behind `T02.2.1` | — |
 | `T02.3.1` P2 exit gate | 🔴 **BLOCKED** | Requires operational acquisition |
 
@@ -148,14 +150,17 @@ These were adopted as **choices**, not derivations, and are now in force.
 
 | # | Blocker | Type | Impact |
 |---|---|---|---|
-| **1** | **D-1** — `T02.2.4` AC2 requires "approval per human-gate decision"; N-2 fixes exactly three gates, none covering research targets | Specification conflict | Blocks `T02.2.4` + **22 downstream P7–P8 tasks** |
-| **2** | **Rights authority unnamed** — N-21 §5.1 places policy ownership outside the platform but names no owner | Organisational | N-21 ratified but inert; no source can be admitted |
-| **3** | **M-02 / M-43** — learning target vocabulary undefined | Open marker | `T02.1.1` AC3 unsatisfiable |
-| **4** | **`source_diversity` ambiguity** — IOM §3.4 says "sources", S-2 says "types" | Corpus disagreement | Blocks clean PT-V4 implementation at `T05.1.4` |
-| **5** | **D-2** — self-direction question has no canonical marker ID | Register gap | Cannot be tracked |
+| **1** | **Rights assessments not yet supplied** — N-24 ratified 2026-08-19 names the authority role (*Designated Source Rights/Compliance Authority*); the role must now be staffed and supply assessments | Organisational (operational, not a decision) | No source can be admitted until assessments arrive; acquisition stays fail-closed (`UNASSESSED`) |
+| **2** | **M-02 / M-43** — learning target vocabulary undefined | Open marker | `T02.1.1` AC3 unsatisfiable |
+| **3** | **`source_diversity` ambiguity** — IOM §3.4 says "sources", S-2 says "types" | Corpus disagreement | Blocks clean PT-V4 implementation at `T05.1.4` |
+| **4** | **D-2** — self-direction question has no canonical marker ID | Register gap | Cannot be tracked |
 
-**Blockers 1 and 2 require human decisions. Neither can be resolved by analysis
-or implementation.**
+**D-1 was resolved 2026-08-19** (Project Owner selected N-23 §5.5(i);
+`T02.2.4` AC2 amended to *"Targets recorded with their commissioning
+authority"*; N-2 unchanged). **Blocker 1 requires a human decision** —
+N-24 was ratified 2026-08-19 — the authority exists; blocker 1 is now
+**operational** (staffing the role and supplying assessments), not a
+decision to be analysed or implemented.
 
 ## 8. What Phase 1 Delivered
 
@@ -195,7 +200,7 @@ its cost.
 
 ```bash
 cd platform
-python -m pytest -q                              # 3,201 pass
+python -m pytest -q                              # 3,204 pass
 python -m pytest -q -m stress                    # 128 pass
 python -m pytest -q --cov=oip --cov-report=term  # 99.04%
 python validation/closure_t01_8_1.py             # 60/60

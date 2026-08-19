@@ -118,6 +118,11 @@ class Provenance:
 
         Sources sharing an independence group count once, so syndicated
         copies cannot inflate corroboration.
+
+        Explicit-input model [T02.1.3 interpretation, 2026-08-19]:
+        ``source_independence_group`` is carried and honoured when supplied.
+        No syndication, ownership or independence inference is performed;
+        any inference requires an explicit ratified rule, and none exists.
         """
         return self.source_independence_group or self.source_identifier
 

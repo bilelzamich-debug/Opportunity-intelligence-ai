@@ -33,9 +33,11 @@ This order is not decorative. It has already resolved two live conflicts:
 
 - **S-2 vs IOM §3.1** — the IOM says `evidential_support` "reflects source
   reliability"; S-2 says trust is not an input. **S-2 governs.**
-- **N-2 vs backlog `T02.2.4` AC2** — the backlog requires a human gate N-2
-  forecloses. **N-2 governs**, so the acceptance criterion is unsatisfiable as
-  written (this is D-1).
+- **N-2 vs backlog `T02.2.4` AC2** — the backlog required a human gate N-2
+  forecloses. **N-2 governed**, so the acceptance criterion was unsatisfiable as
+  written (this was D-1). **Resolved 2026-08-19**: AC2 amended to *"Targets
+  recorded with their commissioning authority"* — the wording pre-specified by
+  N-23 §5.5(i). N-2 is unchanged; no fourth gate exists.
 
 ---
 

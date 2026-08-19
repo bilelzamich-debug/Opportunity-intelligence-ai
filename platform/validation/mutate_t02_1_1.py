@@ -18,15 +18,15 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "oip" / "source.py"
 
 MUTATIONS = [
-    # -- closing M-16 by inventing vocabulary -------------------------------
-    ("M1 taxonomy populated with an invented member",
+    # -- extending the closed vocabulary / defeating exact matching -------
+    ("M1 taxonomy extended with an invented ninth member",
      SRC,
-     "    # INTENTIONALLY EMPTY. Members are supplied by the decision closing M-16.",
-     "    CUSTOMER_REVIEW_CORPUS = \"customer_review_corpus\""),
+     "    # Material published by a vendor about its own offering.\n    VENDOR_PUBLICATION = \"VENDOR_PUBLICATION\"",
+     "    # Material published by a vendor about its own offering.\n    VENDOR_PUBLICATION = \"VENDOR_PUBLICATION\"\n    CUSTOMER_REVIEW_CORPUS = \"customer_review_corpus\""),
     ("M2 classify() guesses instead of refusing",
      SRC,
-     "    raise TaxonomyNotRatifiedError(\n        f\"cannot classify source_type {source_type!r}",
-     "    return source_type  # type: ignore[return-value]\n    raise TaxonomyNotRatifiedError(\n        f\"cannot classify source_type {source_type!r}"),
+     "        raise UntypableChannelError(\n            f\"source_type {source_type!r} maps onto no member",
+     "        return SourceType.PUBLISHED_EDITORIAL\n        raise UntypableChannelError(\n            f\"source_type {source_type!r} maps onto no member"),
     ("M3 membership predicate admits raw strings",
      SRC,
      "    return isinstance(candidate, SourceType) and candidate in set(SourceType)",
@@ -72,8 +72,8 @@ MUTATIONS = [
      "def affects_evidential_support() -> bool:\n    return True"),
     ("M13 source-type diversity counts raw strings",
      SRC,
-     "        raise TaxonomyNotRatifiedError(\n            \"source-type diversity (S-02 input 2)",
-     "        return len({r.source_type for r in self._records.values()})\n        raise TaxonomyNotRatifiedError(\n            \"source-type diversity (S-02 input 2)"),
+     "                if r.source_type in _TAXONOMY_NAMES",
+     "                if True"),
     # -- learnability: M-02 / M-43 ------------------------------------------
     ("M14 trust declared a ratified learning target",
      SRC,
@@ -108,8 +108,8 @@ MUTATIONS = [
     # -- gap reporting -------------------------------------------------------
     ("M21 specification gaps hidden",
      SRC,
-     "        return {\n            \"source_taxonomy\": TAXONOMY_MARKER,",
-     "        return {}\n        return {\n            \"source_taxonomy\": TAXONOMY_MARKER,"),
+     "        return {\n            \"trust_semantics\": TAXONOMY_MARKER,",
+     "        return {}\n        return {\n            \"trust_semantics\": TAXONOMY_MARKER,"),
 ]
 
 

@@ -348,9 +348,12 @@ halt and compensate are undefined and deliberately not implemented.
 No new object states: a gate rejection is `PROPOSED → REJECTED` with
 `status_reason`. **Engines never block** awaiting a gate.
 
-> **This is the source of D-1.** `T02.2.4` AC2 requires "approval per human-gate
+> **This is the source of D-1.** `T02.2.4` AC2 required "approval per human-gate
 > decision" for research targets — a fourth gate N-2 forecloses. Under Article
-> XI, N-2 governs and the acceptance criterion is unsatisfiable as written.
+> XI, N-2 governed and the acceptance criterion was unsatisfiable as written.
+> **D-1 was resolved 2026-08-19**: AC2 amended to *"Targets recorded with their
+> commissioning authority"* (N-23 §5.5(i) wording, verbatim). N-2 is unchanged;
+> no fourth gate exists.
 
 ---
 

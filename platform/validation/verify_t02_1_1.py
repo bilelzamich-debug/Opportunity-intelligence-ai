@@ -23,8 +23,8 @@ from oip.source import (  # noqa: E402
     LEARNING_TARGET_MARKERS, LEARNING_TARGET_STATUS, TAXONOMY_MARKER,
     TAXONOMY_RATIFIED, TRUST_MAXIMUM, TRUST_MINIMUM, SourceEligibility,
     SourceRegistry, SourceType, TrustRating, affects_evidential_support,
-    assess_eligibility, is_learning_target, is_ratified_source_type,
-    taxonomy_members,
+    assess_eligibility, classify, is_learning_target,
+    is_ratified_source_type, taxonomy_members,
 )
 
 RESULTS: list[tuple[str, str, bool, str]] = []
@@ -35,6 +35,14 @@ def check(section: str, name: str, cond: bool, detail: str = "") -> None:
 
 
 SRC = (ROOT / "oip" / "source.py").read_text()
+# The ratified member list, extracted MECHANICALLY from the N-20 decision
+# record's S 5.1 table (first table of that section, in table order). AC1 is
+# proven by matching the enum against the decision text, not against a
+# transcription -- the two cannot drift.
+_N20 = (DOCS / "decisions" / "N-20-source-model.md").read_text()
+_N20_MEMBERS = re.findall(
+    r"^\|\s*`([A-Z_]+)`\s*\|",
+    _N20.split("### 5.1")[1].split("### 5.2")[0], re.M)
 TREE = ast.parse(SRC)
 V2 = (DOCS / "PKP_v2_Master_Reference.md").read_text()
 IOM = (DOCS / "PKP_Intelligence_Object_Model.md").read_text()
@@ -43,9 +51,11 @@ S02 = (DOCS / "decisions" / "S-02-evidential-support-function.md").read_text()
 # ===========================================================================
 # A. Open markers remain open
 # ===========================================================================
-check("A", "M-16 still open: taxonomy is unpopulated",
-      len(list(SourceType)) == 0 and TAXONOMY_RATIFIED is False,
-      f"{len(list(SourceType))} members")
+check("A", "M-16 taxonomy half closed: eight members, exactly N-20 S 5.1",
+      len(list(SourceType)) == 8 and TAXONOMY_RATIFIED is True
+      and [m.name for m in SourceType] == _N20_MEMBERS
+      and len(_N20_MEMBERS) == 8,
+      f"enum={[m.name for m in SourceType]} n20={_N20_MEMBERS}")
 check("A", "M-16 still open in the canonical register",
       re.search(r"\|\s*M-16\s*\|\s*Source taxonomy, eligibility, trust model",
                 V2) is not None)
@@ -59,8 +69,9 @@ check("A", "M-16 closed only partially, only by N-20",
       and "partially" in re.search(r"^\|\s*\*\*Closes\*\*\s*\|(.+?)\|",
                                    _m16[0].read_text(), re.M).group(1),
       f"closers={[p.stem for p in _m16]}")
-check("A", "eligibility never resolves while M-16 is open",
-      assess_eligibility("s").outcome is SourceEligibility.UNDETERMINED)
+check("A", "eligibility from a bare identifier stays UNDETERMINED",
+      assess_eligibility("s").outcome is SourceEligibility.UNDETERMINED
+      and assess_eligibility("s").blocking_marker is None)
 check("A", "M-02/M-43/M-70 still open: trust is not a learning target",
       is_learning_target() is False
       and set(LEARNING_TARGET_MARKERS) == {"M-02", "M-43", "M-70"})
@@ -91,8 +102,8 @@ for node in ast.walk(TREE):
             if isinstance(stmt, ast.Assign)
             for t in stmt.targets if isinstance(t, ast.Name)
         ]
-check("B", "SourceType declares zero members in source",
-      enum_members.get("SourceType", []) == [],
+check("B", "SourceType declares exactly the N-20 S 5.1 members",
+      enum_members.get("SourceType", []) == _N20_MEMBERS,
       str(enum_members.get("SourceType")))
 # Scan EXECUTABLE code only. The module docstring legitimately cites the
 # IOM's example value to explain why the taxonomy is empty; prose that
@@ -114,10 +125,11 @@ _example_values = re.findall(
 check("B", "no source-type literal appears in executable code",
       not _example_values,
       f"example values leaked into code: {sorted(set(_example_values))}")
-check("B", "SourceType has no member assignments in its class body",
-      not [st for cd in ast.walk(ast.parse(SRC))
+check("B", "SourceType class body carries exactly eight assignments",
+      len([st for cd in ast.walk(ast.parse(SRC))
            if isinstance(cd, ast.ClassDef) and cd.name == "SourceType"
            for st in cd.body if isinstance(st, (ast.Assign, ast.AnnAssign))])
+      == 8)
 check("B", "trust range is inherited, not invented",
       TRUST_MINIMUM == 0.0 and TRUST_MAXIMUM == 1.0
       and "source_reliability" in SRC,
@@ -148,10 +160,17 @@ check("C", "the registry exposes no scoring surface",
            if not n.startswith("_")
            and any(f in n.lower()
                    for f in ("evidential", "confidence", "score", "weight"))])
-check("C", "source-type diversity (S-02 input 2) fails closed",
-      "TaxonomyNotRatifiedError" in
-      SRC.split("def source_type_diversity")[1][:800],
-      "counting raw strings would substitute an uncontrolled vocabulary")
+_div_reg = SourceRegistry()
+_div_reg.register("d1", "PUBLISHED_EDITORIAL")
+_div_reg.register("d2", "PUBLISHED_EDITORIAL")
+_div_reg.register("d3", "MARKETPLACE_LISTING")
+_div_reg.register("d4", "not-a-ratified-type")
+_div_body = SRC.split("def source_type_diversity")[1][:900]
+check("C", "source-type diversity counts classified members only",
+      "TaxonomyNotRatifiedError" not in _div_body
+      and "_TAXONOMY_NAMES" in _div_body
+      and _div_reg.source_type_diversity() == 2,
+      f"diversity={_div_reg.source_type_diversity()} (want 2)")
 
 # ===========================================================================
 # D. CI-1 isolation and module boundaries
@@ -198,9 +217,19 @@ check("E", "exactly one production module was added",
 # ===========================================================================
 # F. Acceptance criteria status
 # ===========================================================================
-check("F", "AC1 taxonomy: structure present, content fails closed",
-      hasattr(src_mod, "SourceType") and taxonomy_members() == ()
-      and is_ratified_source_type("anything") is False)
+_untypable_raises = False
+try:
+    classify("not-a-ratified-type")
+except src_mod.UntypableChannelError:
+    _untypable_raises = True
+check("F", "AC1 taxonomy: closed set populated exactly from N-20 S 5.1",
+      hasattr(src_mod, "SourceType")
+      and [m.name for m in taxonomy_members()] == _N20_MEMBERS
+      and is_ratified_source_type(SourceType.PUBLISHED_EDITORIAL) is True
+      and is_ratified_source_type("PUBLISHED_EDITORIAL") is False
+      and is_ratified_source_type("anything") is False
+      and classify("REGULATORY_FILING") is SourceType.REGULATORY_FILING
+      and _untypable_raises)
 check("F", "AC2 trust: recordable, versioned, never defaulted",
       hasattr(SourceRegistry, "record_trust")
       and hasattr(SourceRegistry, "trust_history")

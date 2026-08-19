@@ -6,7 +6,9 @@ Architecture References:
 - N-04   Historical reads must reproduce at any scale
 - N-16   Independence grouping must hold at volume
 - R-01   Append-only history is never truncated
-- M-16   The taxonomy gap must stay closed under every access pattern
+- N-20   The closed eight-member taxonomy (S 5.1) must hold under every
+         access pattern: volume never extends it, and raw strings outside
+         the set never classify
 
 Run with `-m stress`; deselected from the default suite.
 """
@@ -19,11 +21,14 @@ import time
 import pytest
 
 from oip.source import (
+    TAXONOMY_RATIFIED,
     SourceEligibility,
     SourceRegistry,
-    TaxonomyNotRatifiedError,
+    UntypableChannelError,
     assess_eligibility,
+    classify,
     is_ratified_source_type,
+    taxonomy_members,
 )
 
 pytestmark = pytest.mark.stress
@@ -79,16 +84,20 @@ class TestVolume:
         assert len(reg.unrated()) == 2_500
 
 
-class TestGapHoldsUnderLoad:
-    def test_taxonomy_never_populates_however_many_sources_register(self):
-        """M-16 stays open regardless of access volume."""
+class TestClosedSetHoldsUnderLoad:
+    def test_taxonomy_never_extends_however_many_sources_register(self):
+        """N-20 S 5.1: the closed set stays exactly eight members regardless
+        of access volume; raw strings never classify onto it."""
         reg = SourceRegistry()
         for i in range(3_000):
             reg.register(f"src-{i}", f"raw-type-{i}")
             if i % 500 == 0:
                 assert is_ratified_source_type(f"raw-type-{i}") is False
-        with pytest.raises(TaxonomyNotRatifiedError):
-            reg.source_type_diversity()
+                with pytest.raises(UntypableChannelError):
+                    classify(f"raw-type-{i}")
+        assert len(taxonomy_members()) == 8
+        assert TAXONOMY_RATIFIED is True
+        assert reg.source_type_diversity() == 0
 
     def test_eligibility_stays_undetermined_across_many_assessments(self):
         outcomes = {assess_eligibility(f"src-{i}").outcome for i in range(5_000)}

@@ -1,0 +1,1 @@
+../docs/decisions/N-24-source-rights-authority.md

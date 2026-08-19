@@ -74,6 +74,7 @@ One file each. Never merged.
 - [`N-21-acquisition-rights.md`](docs/decisions/N-21-acquisition-rights.md) — N-21 — Acquisition Rights: Per-Source Assessment Recorded on Evidence, Enforced Before Acquisition
 - [`N-22-coverage-model.md`](docs/decisions/N-22-coverage-model.md) — N-22 — Coverage Model: Source-Type Coverage with Explicit Gap Declaration
 - [`N-23-research-trigger.md`](docs/decisions/N-23-research-trigger.md) — N-23 — Research Trigger: Directive-Scoped Acquisition Within Scheduled Cycles
+- [`N-24-source-rights-authority.md`](docs/decisions/N-24-source-rights-authority.md) — N-24 — Acquisition-Rights Authority: Designated Role, Scope Limited to N-21 §5.5
 - [`R-01-immutable-versioned-objects.md`](docs/decisions/R-01-immutable-versioned-objects.md) — R-01 — Immutable Versioned Objects
 - [`R-02-object-lifecycle.md`](docs/decisions/R-02-object-lifecycle.md) — R-02 — Seven-State Object Lifecycle
 - [`R-03-confidence-model.md`](docs/decisions/R-03-confidence-model.md) — R-03 — Two-Component Confidence with Monotonic Ceiling

@@ -3,11 +3,11 @@
 Task: T02.1.1
 
 Architecture References:
-- M-16   Source taxonomy, eligibility, trust model. **OPEN.** PKP v2 section 9:
-         "No source taxonomy, no eligibility criteria, no source trust or
-         credibility model... This is the highest-severity omission in the
-         engine set." v2 section 13 schedules it "Must resolve in P2".
-         Subsumes OQ-28 (source trust attribute) per marker-crosswalk section 5.
+- M-16   Source taxonomy, eligibility, trust model. **PARTIALLY CLOSED by
+         N-20 (RATIFIED 2026-08-04):** taxonomy (S 5.1), eligibility (S 5.2),
+         trust representation (S 5.3). The scoring half stays OPEN -- making
+         trust score requires superseding S-02. Subsumes OQ-28 per
+         marker-crosswalk section 5 (closed with N-20 S 5.3).
 - S-02   evidential_support has FIVE EXHAUSTIVE inputs -- "No other input."
          Source trust is NOT among them. Trust recorded here therefore does
          NOT score, and this module exposes no path by which it could.
@@ -52,17 +52,23 @@ WHAT IS RATIFIED, AND THEREFORE IMPLEMENTED
 
 WHAT IS **NOT** RATIFIED, AND THEREFORE FAILS CLOSED
 ----------------------------------------------------
-M-16 supplies NO taxonomy members. The ratified corpus enumerates zero source
-types; the IOM's sole value, `customer_review_corpus`, appears in a worked
-example, not a vocabulary. Accordingly:
+N-20 (RATIFIED 2026-08-04) supplies the taxonomy: the closed eight-member
+set of section 5.1 is enumerated verbatim below. Extension requires a
+superseding decision record; inline addition is prohibited (N-20 S 5.1,
+C17). Accordingly:
 
-* `SourceType` is an EMPTY closed vocabulary. It is empty because M-16 has
-  not populated it -- not because the concept is absent. Any attempt to
-  classify a source raises `TaxonomyNotRatifiedError`.
-* `SourceEligibility` cannot be decided: eligibility is per-type (backlog
-  T02.1.1) and there are no types. `assess_eligibility` therefore returns
-  UNDETERMINED and `require_eligible` raises. Nothing is admitted by default;
-  nothing is rejected by invented rule.
+* `SourceType` is a POPULATED closed vocabulary -- exactly the eight N-20
+  S 5.1 members, nothing else. `classify` maps a raw string onto the
+  taxonomy and raises `UntypableChannelError` for anything outside it:
+  under N-20 S 5.2 an untypable channel is INELIGIBLE (UNTYPABLE_CHANNEL,
+  gate 2 of S 5.2.1).
+* `SourceEligibility` from an identifier ALONE remains UNDETERMINED:
+  eligibility under M-16 IS typability (N-20 S 5.2), and typability is
+  decided on the channel type the Research Engine assigns at acquisition
+  (N-20 S 5.1; the acquisition path is T02.2.1, not yet built).
+  `assess_eligibility` therefore still returns UNDETERMINED and
+  `require_eligible` still raises. Nothing is admitted by default; nothing
+  is rejected by invented rule.
 * Trust is RECORDED but never DEFAULTED. An unrated source reports `None`,
   never a neutral value: "all sources weigh equally" is described by the IOM
   as a "strong unstated assumption" and by v2 as the defect M-16 exists to
@@ -94,12 +100,17 @@ class SourceError(Exception):
     """Base class for source-model violations."""
 
 
-class TaxonomyNotRatifiedError(SourceError):
-    """The source taxonomy has no members because M-16 is open. [M-16]"""
+class UntypableChannelError(SourceError):
+    """The raw source_type maps onto no ratified taxonomy member.
+
+    [N-20 S 5.2: an untypable channel is INELIGIBLE; UNTYPABLE_CHANNEL,
+    gate 2 of the S 5.2.1 acquisition sequence]
+    """
 
 
 class EligibilityNotRatifiedError(SourceError):
-    """Eligibility cannot be decided because M-16 is open. [M-16]"""
+    """Eligibility cannot be decided from an identifier alone; the channel
+    type is assigned at acquisition. [N-20 S 5.1-S 5.2]"""
 
 
 class SourceNotFoundError(SourceError):
@@ -119,38 +130,66 @@ class LearningTargetNotRatifiedError(SourceError):
 
 
 # ---------------------------------------------------------------------------
-# Taxonomy  [AC1 -- structurally present, deliberately unpopulated]
+# Taxonomy  [AC1 -- populated exactly from N-20 S 5.1]
 # ---------------------------------------------------------------------------
 
 
 class SourceType(str, Enum):
-    """The closed source-type taxonomy. **EMPTY: M-16 is open.**
+    """The closed source-type taxonomy, by acquisition channel. [N-20 S 5.1]
 
     Closed vocabularies in this platform are enumerated by a ratified
     decision, never inline -- R-2's seven states, R-6's ten relationship
-    types, R-3's five bands. M-16 is the decision that would enumerate this
-    one, and it has not been taken.
+    types, R-3's five bands. **N-20 (RATIFIED 2026-08-04) is the decision
+    that enumerates this one.** The eight members, their names and their
+    order below are N-20 S 5.1 verbatim; extension requires a superseding
+    decision record and inline addition is prohibited (N-20 S 5.1, C17).
 
-    The enum exists so that the taxonomy has a single home and a stable
-    import path when M-16 closes. It has no members because inventing them
-    would close M-16 by implementation choice, which the register forbids.
+    Exactly one member applies per source: a source reachable through more
+    than one channel is typed by the channel actually used at acquisition.
+    The Research Engine assigns `source_type` at acquisition (N-20 S 5.1).
     """
 
-    # INTENTIONALLY EMPTY. Members are supplied by the decision closing M-16.
+    # Material published by an identified editorial body.
+    PUBLISHED_EDITORIAL = "PUBLISHED_EDITORIAL"
+    # Listings, catalogue or transactional records from a marketplace.
+    MARKETPLACE_LISTING = "MARKETPLACE_LISTING"
+    # Reviews or ratings authored by end users.
+    USER_GENERATED_REVIEW = "USER_GENERATED_REVIEW"
+    # Forum, community or discussion-thread material.
+    USER_GENERATED_DISCUSSION = "USER_GENERATED_DISCUSSION"
+    # Complaint, support-ticket or service-transcript material.
+    SUPPORT_INTERACTION = "SUPPORT_INTERACTION"
+    # Datasets published as data, including public and licensed corpora.
+    STRUCTURED_DATASET = "STRUCTURED_DATASET"
+    # Filings or disclosures lodged with a regulatory body.
+    REGULATORY_FILING = "REGULATORY_FILING"
+    # Material published by a vendor about its own offering.
+    VENDOR_PUBLICATION = "VENDOR_PUBLICATION"
+
+
+_TAXONOMY_NAMES: frozenset[str] = frozenset(
+    member.value for member in SourceType
+)
+"""The ratified member names as raw strings, for exact-value membership.
+
+Raw acquisition strings are compared by VALUE, never coerced: a typo must
+fail closed as untypable, not silently register as a distinct type."""
 
 
 TAXONOMY_RATIFIED: bool = len(SourceType) > 0
-"""Whether M-16 has populated the taxonomy. False until it is ratified."""
+"""Whether the taxonomy is populated. True since N-20 (ratified 2026-08-04,
+S 5.1) supplied the eight members. The scoring half of M-16 remains OPEN."""
 
 TAXONOMY_MARKER: str = "M-16"
 """The marker whose closure populates SourceType. [v2 section 13]"""
 
 
 def taxonomy_members() -> tuple[SourceType, ...]:
-    """Every ratified source type, in declaration order.
+    """Every ratified source type, in N-20 S 5.1 declaration order.
 
-    Returns an empty tuple while M-16 is open. Callers must treat an empty
-    taxonomy as "not yet specified", never as "no sources exist".
+    The eight members and their order are the ratified table verbatim.
+    Callers must never treat the taxonomy as extensible from outside a
+    superseding decision record.
     """
     return tuple(SourceType)
 
@@ -158,25 +197,37 @@ def taxonomy_members() -> tuple[SourceType, ...]:
 def is_ratified_source_type(candidate: object) -> bool:
     """Whether `candidate` is a member of the ratified taxonomy.
 
-    Always False while M-16 is open. This is a total predicate -- it never
-    raises -- so callers can branch without handling the open-marker case.
+    True only for `SourceType` members. A raw STRING is never a member of
+    this typed predicate -- use `classify` to test a raw string by value.
+    Total: never raises, so callers can branch without exception handling.
     """
     return isinstance(candidate, SourceType) and candidate in set(SourceType)
 
 
 def classify(source_type: str) -> SourceType:
-    """Map a raw source_type string onto the ratified taxonomy. [AC1]
+    """Map a raw source_type string onto the ratified taxonomy. [AC1, N-20 S 5.1]
 
-    FAILS CLOSED. No mapping can exist while the taxonomy is empty, and
-    guessing one would invent the vocabulary M-16 owns.
+    Exact member names only: the closed set admits no synonyms and no case
+    folding, so a typo cannot register as a distinct type. A string outside
+    the set is UNTYPABLE (N-20 S 5.2) -- the channel maps to no taxonomy
+    member, gate 2 of the S 5.2.1 acquisition sequence refuses it, and the
+    source is INELIGIBLE. Fails closed; nothing is guessed.
     """
-    raise TaxonomyNotRatifiedError(
-        f"cannot classify source_type {source_type!r}: the source taxonomy "
-        f"is unpopulated because {TAXONOMY_MARKER} is OPEN. PKP v2 section 13 "
-        f"schedules it 'Must resolve in P2'; no ratified source enumerates a "
-        f"single source type. Populating it here would close a marker by "
-        f"implementation choice."
-    )
+    if not isinstance(source_type, str):
+        raise SourceError(
+            f"source_type must be a string, got {type(source_type).__name__}"
+        )
+    if not source_type.strip():
+        raise SourceError("source_type is required [IOM section 3.1]")
+    try:
+        return SourceType(source_type)
+    except ValueError:
+        raise UntypableChannelError(
+            f"source_type {source_type!r} maps onto no member of the closed "
+            f"taxonomy [N-20 S 5.1]: the channel is untypable "
+            f"(UNTYPABLE_CHANNEL, N-20 S 5.2), hence INELIGIBLE for "
+            f"acquisition. Extension requires a superseding decision record."
+        ) from None
 
 
 # ---------------------------------------------------------------------------
@@ -218,11 +269,14 @@ class EligibilityAssessment:
 
 
 def assess_eligibility(source_identifier: str) -> EligibilityAssessment:
-    """Assess whether a source may be acquired from. [AC1, M-16]
+    """Assess whether a source may be acquired from. [AC1, N-20 S 5.2]
 
     FAILS CLOSED, and does so without raising, so that callers can record
-    the gap rather than crash. Eligibility is specified per source TYPE
-    (backlog T02.1.1); with no types there is no predicate to evaluate.
+    the gap rather than crash. Eligibility under M-16 IS typability
+    (N-20 S 5.2): decidable by `classify` on the channel type the Research
+    Engine assigns at acquisition (N-20 S 5.1). From a bare identifier no
+    type is visible, so the outcome is UNDETERMINED -- no open MARKER blocks
+    it; the acquisition path (T02.2.1) that supplies typed channels does.
 
     Note the boundary: legal admissibility -- licensing, robots, rate limits,
     terms of use -- is M-18 and belongs to T02.1.2. It is not assessed here
@@ -234,27 +288,29 @@ def assess_eligibility(source_identifier: str) -> EligibilityAssessment:
         source_identifier=source_identifier,
         outcome=SourceEligibility.UNDETERMINED,
         reason=(
-            "per-type eligibility is undefined: the source taxonomy is "
-            "unpopulated while M-16 is OPEN, so no per-type predicate exists "
-            "to evaluate. Legal admissibility is M-18 (T02.1.2) and is not "
-            "assessed here."
+            "typability cannot be evaluated from source_identifier alone: "
+            "eligibility under M-16 IS typability (N-20 S 5.2), and the "
+            "channel type is assigned by the Research Engine at acquisition "
+            "(N-20 S 5.1; the acquisition path is T02.2.1, not yet built). "
+            "Call classify() on the typed channel to decide. Legal "
+            "admissibility is M-18 (T02.1.2) and is not assessed here."
         ),
-        blocking_marker=TAXONOMY_MARKER,
+        blocking_marker=None,
     )
 
 
 def require_eligible(source_identifier: str) -> None:
     """Admit acquisition only from a demonstrably eligible source.
 
-    FAILS CLOSED: raises while M-16 is open. A permissive default would be
-    B-33 Option 1 ("open -- any accessible source"), an option the ratified
-    corpus never adopted.
+    FAILS CLOSED: raises while the channel is untyped. A permissive default
+    would be B-33 Option 1 ("open -- any accessible source"), an option the
+    ratified corpus never adopted.
     """
     assessment = assess_eligibility(source_identifier)
     if not assessment.admits_acquisition:
         raise EligibilityNotRatifiedError(
             f"source {source_identifier!r} cannot be admitted: "
-            f"{assessment.reason} [{assessment.blocking_marker}]"
+            f"{assessment.reason}"
         )
 
 
@@ -394,7 +450,10 @@ class SourceRecord:
 
     `source_type` is retained as the RAW string the acquirer supplied, exactly
     as the ratified Evidence contract does (Provenance.source_type: str). It
-    is not coerced onto the taxonomy, because the taxonomy is empty.
+    is not coerced onto the taxonomy at registration: classification is an
+    explicit act (`classify`), and the Research Engine assigns the type at
+    acquisition (N-20 S 5.1). `taxonomy_classified` reports whether the raw
+    string maps onto a member.
     """
 
     source_identifier: str
@@ -418,6 +477,11 @@ class SourceRecord:
         Identical rule to the ratified `Provenance.independence_key`
         (T01.7.1): the grouping wins where present, so syndicated copies
         count once. Reused deliberately rather than redefined.
+
+        Explicit-input model [T02.1.3 interpretation, 2026-08-19]:
+        ``independence_group`` is carried and honoured when supplied. This
+        module performs NO syndication, ownership or independence inference;
+        any inference requires an explicit ratified rule, and none exists.
         """
         return self.independence_group or self.source_identifier
 
@@ -440,8 +504,15 @@ class SourceRecord:
 
     @property
     def taxonomy_classified(self) -> bool:
-        """Whether source_type is a ratified taxonomy member. False until M-16."""
-        return is_ratified_source_type(self.source_type)
+        """Whether the raw source_type string maps onto the ratified taxonomy.
+
+        Value-based: the raw string is tested against the ratified member
+        names. `is_ratified_source_type` is the TYPED predicate for enum
+        members and is deliberately not used here -- a raw string is not an
+        enum instance, and coercing it would blur registration with the
+        explicit classification act.
+        """
+        return self.source_type in _TAXONOMY_NAMES
 
 
 @dataclass
@@ -618,17 +689,21 @@ class SourceRegistry:
     def source_type_diversity(self) -> int:
         """Distinct source TYPES registered -- S-02 input 2.
 
-        FAILS CLOSED. S-02 input 2 counts "distinct source *types*", which
-        presupposes the taxonomy M-16 has not supplied. Counting raw strings
-        would silently substitute an uncontrolled vocabulary for a closed one
-        and let a typo register as diversity -- precisely the sampling-artefact
-        failure S-02 property P3 exists to prevent.
+        Counts distinct members of the ratified taxonomy (N-20 S 5.1) among
+        registered sources, by value. Raw strings mapping onto no member are
+        NOT counted: counting them would substitute an uncontrolled
+        vocabulary for the closed one and let a typo register as diversity --
+        precisely the sampling-artefact failure S-02 property P3 exists to
+        prevent. Untypable registrations are out-of-frame for diversity;
+        declaring them is the coverage model's duty (N-22, T02.1.4), not
+        this method's.
         """
-        raise TaxonomyNotRatifiedError(
-            "source-type diversity (S-02 input 2) requires the closed "
-            "taxonomy; counting raw source_type strings would substitute an "
-            "uncontrolled vocabulary for a ratified one [M-16, S-02]"
-        )
+        with self._lock:
+            return len({
+                r.source_type
+                for r in self._records.values()
+                if r.source_type in _TAXONOMY_NAMES
+            })
 
     # -- introspection -----------------------------------------------------
 
@@ -636,14 +711,14 @@ class SourceRegistry:
         """Every capability this module cannot supply, and its marker.
 
         Machine-readable so a gate can assert the gaps stay open rather than
-        being quietly closed by a later edit.
+        being quietly closed by a later edit. Capabilities N-20 S 8 closed --
+        source_taxonomy (S 5.1), per_type_eligibility (S 5.2) and
+        source_type_diversity -- are no longer gaps and are deliberately
+        absent from this mapping.
         """
         return {
-            "source_taxonomy": TAXONOMY_MARKER,
-            "per_type_eligibility": TAXONOMY_MARKER,
             "trust_semantics": TAXONOMY_MARKER,
             "trust_banding": TAXONOMY_MARKER,
-            "source_type_diversity": TAXONOMY_MARKER,
             "trust_affects_scoring": "S-02",
             "learning_target": "M-02",
             "learning_write_authority": "M-43",

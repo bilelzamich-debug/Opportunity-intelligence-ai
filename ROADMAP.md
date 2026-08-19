@@ -11,7 +11,7 @@ begins. Phase boundaries come from PKP v1 §9; blocking markers from PKP v2 §14
 |---|---|---|---|---|
 | **P0** | Specification | 37 decisions | ✅ **CLOSED** | — |
 | **P1** | Foundation | 44 | ✅ **CLOSED** 2026-08-04 | — |
-| **P2** | Research Engine | 10 | 🟡 **BLOCKED** | D-1, rights authority |
+| **P2** | Research Engine | 10 | 🟡 **IN PROGRESS** | role-supplied assessments (N-24 ratified 2026-08-19; D-1 resolved) |
 | **P3** | Fact Extraction | ~15 | ⬜ | M-19, M-11, M-20 |
 | **P4** | Problem Intelligence | ~12 | ⬜ | M-12, M-21, M-22, M-06 |
 | **P5** | Pattern Intelligence | ~14 | ⬜ | M-23, M-24, M-25, M-13 |
@@ -67,29 +67,31 @@ times** — the first two halted on defects that all prior validation missed.
 
 ---
 
-## P2 — Research Engine 🟡 BLOCKED
+## P2 — Research Engine 🟡 IN PROGRESS (acquisition gated on role-supplied assessments)
 
 **Goal.** Acquire external source material as Evidence with complete
 provenance. The platform's only external-world acquisition boundary.
 
 **Ratified 2026-08-04:** N-20 (source model) · N-21 (acquisition rights) ·
 N-22 (coverage) · N-23 (research trigger).
+**2026-08-19:** D-1 resolved (N-23 §5.5(i)) · `T02.1.3` closed · N-24 ratified.
 
 | Task | Status |
 |---|---|
-| `T02.1.1` Source model | 🟡 AC1 ✅ AC2 ✅ **AC3 ❌** (M-02/M-43) |
-| `T02.1.2` Licensing enforcement | 🟢 Unblocked, **inert** |
-| `T02.1.3` Independence grouping | 🟢 **READY TODAY** |
+| `T02.1.1` Source model | 🟡 AC1 ✅ (populated from N-20 §5.1, 2026-08-19) AC2 ✅ **AC3 ❌** (M-02/M-43) |
+| `T02.1.2` Licensing enforcement | 🟢 **Implementable** (not operational) — N-24 ratified; awaits role-supplied assessments |
+| `T02.1.3` Independence grouping | ✅ **CLOSED 2026-08-19** (explicit-input model) |
 | `T02.1.4` Coverage model | 🟢 Unblocked |
 | `T02.2.1` Acquisition | 🟡 Sequenced |
 | `T02.2.2` Duplicate detection | 🟡 Sequenced |
 | `T02.2.3` Drift detection | 🟡 Sequenced |
-| `T02.2.4` Directive intake | 🔴 **BLOCKED — D-1** |
+| `T02.2.4` Directive intake | 🟡 **Unblocked 2026-08-19** (D-1 resolved, N-23 §5.5(i)) |
 | `T02.2.5` Failure recording | 🟡 Sequenced |
 | `T02.3.1` P2 exit gate | 🔴 **BLOCKED** |
 
 **Exit requires the platform to have actually acquired something** — currently
-impossible until the rights authority is named.
+impossible until the N-24 role is staffed and supplies assessments
+(ratification alone admits nothing).
 
 ---
 

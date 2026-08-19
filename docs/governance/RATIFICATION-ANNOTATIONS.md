@@ -205,3 +205,21 @@ this layer → IOM → PKP v2).
 **Reservations carried into force.** AS-0…AS-5 remain recorded in the
 *Honest Limitations* sections of N-20 and N-22. Ratification adopted them as
 **choices**, not as corpus-derived consequences.
+
+---
+
+## 11. Owner Decisions — D-1 Resolution, T02.1.3 Interpretation, N-24 Ratification (2026-08-19)
+
+Three acts were taken by the Project Owner on **2026-08-19**: the D-1
+resolution (reserved to the ratifier by N-23 §5.5), the `T02.1.3` AC1
+reading (carried-vs-detected, `NEXT_STEPS.md` §4), and the ratification of
+**N-24**, which names the authority N-21 §5.1 deliberately left unnamed. No frozen document is rewritten; this section records
+the binding interpretation (§1 precedence: decision records → this layer →
+IOM → PKP v2 → backlog).
+
+| Target | Annotation |
+|---|---|
+| **D-1** | **RESOLVED — Option N-23 §5.5(i).** `T02.2.4` AC2 is amended to *"Targets recorded with their commissioning authority"* — the exact wording ratified in N-23 §5.5(i). **N-2 is unchanged**; no fourth human gate is created; commissioning remains a pre-platform act that the platform records, never adjudicates (N-23 §5.5). The backlog AC text is amended (backlog is not frozen; it sits below this layer in precedence). `T02.2.4` is unblocked and sequenced behind `T02.2.1`; the 22 downstream P7–P8 tasks blocked on D-1 are unblocked. M-01's "target approval (D-1)" remainder is closed. |
+| **`T02.1.3` AC1** | **Interpreted — explicit-input model.** `source_independence_group` is supplied explicitly as an input and is carried and honoured wherever supplied; the fallback rule (`independence_group or source_identifier`, N-16/T01.7.1) governs where absent. **The platform performs no syndication, ownership or independence inference.** Any future inference of independence or syndication requires an explicit ratified rule; none exists. This is the conservative, fail-closed reading of N-16, which defines assessment mechanics (the grouping key) but never assigns detection to any engine. |
+| **`T02.1.3` status** | **CLOSED 2026-08-19 on existing evidence** — the explicit-input model is the implemented, tested reality: `oip/source.py` (registry `independence_group`, `independence_key`, `independence_groups()`), `oip/evidence.py` (`Provenance.source_independence_group`, `independence_key`, `independent_sources()`), with tests `test_source.py` and `test_evidence.py` (`test_independence_key_defaults_to_source`, `test_independence_group_overrides_source`, `test_independent_sources_deduplicated`). AC2 holds: sources sharing a supplied group count once. `T02.1.4` (declared dependent) is unblocked by this closure. |
+| **N-24** | **RATIFIED 2026-08-19 — N-21 §5.1 authority named.** The "named human authority outside the platform" is the role **Designated Source Rights/Compliance Authority** (`decisions/N-24-source-rights-authority.md`). **N-21 is unchanged and not superseded**; N-24 supplies what §5.1 deliberately left unnamed, closing its §10 item 2. Scope is bound to the N-21 §5.5 vocabulary only — no M-18b conduct powers, no trust scoring (S-2), no taxonomy assignment (N-20 §5.1), no research scoping (N-23); the N-21 §12 compliance discrepancy remains open. **Ratification does not operationalise acquisition**: sources stay `UNASSESSED` until the role is staffed and supplies assessments (N-21 §6 item 2), and `T02.1.2` is implementable, not operational. |
