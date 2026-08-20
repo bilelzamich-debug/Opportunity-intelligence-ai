@@ -15,8 +15,9 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T02.2.5` (failure recording) — sequenced
-behind `T02.2.1`, now closed along with `T02.2.3`. ~~`T02.2.3`~~ — ✅
+**What is executable now:** `T02.2.4` only if the directive decision
+path proceeds, and `T02.3.1` (the P2 exit gate) once every AC is
+satisfied. All Feature F02.2 implementation tasks are now CLOSED. ~~`T02.2.3`~~ — ✅
 **CLOSED 2026-08-20**: `oip/drift.py` implements N-15's mismatch test
 against a named original, records drift in an append-only register, and
 supersedes exactly on the caller's explicit fidelity declaration. ~~`T02.2.1`~~ — ✅ **CLOSED 2026-08-19**: `oip/acquisition.py`
@@ -154,7 +155,7 @@ against the ratified corpus, not merely the backlog's declared edges.
 | 5 | `T02.2.1` Acquisition | ✅ **CLOSED 2026-08-19** | `oip/acquisition.py`; verifier 25/25; mutation 15/15 |
 | 6 | `T02.2.2` Duplicate detection | ✅ **CLOSED 2026-08-19** | E-V6 classified at acquisition (`DUPLICATE_ACQUISITION`); `held_duplicate` detection; measurable fail-closed rate. Verifier 25/25; mutation 12/12 |
 | 7 | `T02.2.3` Drift detection | ✅ **CLOSED 2026-08-20** | `oip/drift.py`; verifier 26/26; mutation 13/13 |
-| 8 | `T02.2.5` Failure recording | 🟡 Sequenced | Specification complete (N-10) |
+| 8 | `T02.2.5` Failure recording | ✅ **CLOSED 2026-08-20** | AcquisitionLog.attach(FailureStore) projects every refusal with N-10's six identifications; `attempted` derived from stage. Verifier 23/23; mutation 12/12 |
 | 9 | `T02.2.4` Directive intake | 🟡 **Unblocked 2026-08-19** | D-1 resolved (N-23 §5.5(i)); sequenced behind `T02.2.1`, `T01.6.1` |
 | 10 | `T02.3.1` P2 exit gate | 🔴 Blocked | Requires all of the above + operational acquisition |
 

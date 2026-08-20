@@ -385,10 +385,12 @@ class TestFailuresRecorded:
             reason="UNASSESSED",
             detail="d",
             failed_at=T0,
+            engine_configuration_ref="cfg-test",
         )
         for bad in (
             {"source_identifier": " "}, {"reason": ""},
             {"detail": ""}, {"failed_at": "x"},
+            {"engine_configuration_ref": ""},   # N-10: config in force
         ):
             with pytest.raises(AcquisitionError):
                 AcquisitionFailure(**{**ok, **bad})

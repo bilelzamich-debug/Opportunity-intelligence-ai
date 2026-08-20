@@ -56,11 +56,11 @@ supersessions.** No frozen document was rewritten.
 | Metric | Value | How verified |
 |---|---|---|
 | Production modules | **34** | `ls oip/*.py \| wc -l` |
-| Production lines | **20,429** | `wc -l oip/*.py` |
-| Test files | **42** | `ls tests/*.py \| wc -l` |
-| Unit tests | **3,355 passing** | `pytest -q` |
+| Production lines | **20,532** | `wc -l oip/*.py` |
+| Test files | **43** | `ls tests/*.py \| wc -l` |
+| Unit tests | **3,377 passing** | `pytest -q` |
 | Stress tests | **128 passing** | `pytest -q -m stress` |
-| **Total tests** | **3,483 passing, 0 failing** | both suites |
+| **Total tests** | **3,505 passing, 0 failing** | both suites |
 | Total coverage | **99.0%** | `pytest --cov=oip` |
 | Modules below 95% | **0** | mechanical per-module check |
 | Architecture verifiers | **443 checks passing** | 8 verifier scripts |
@@ -71,6 +71,7 @@ supersessions.** No frozen document was rewritten.
 | Mutation score (acquisition) | **15/15 killed** | `mutate_t02_2_1.py` |
 | Mutation score (duplicates) | **12/12 killed** | `mutate_t02_2_2.py` |
 | Mutation score (drift) | **13/13 killed** | `mutate_t02_2_3.py` |
+| Mutation score (failure recording) | **12/12 killed** | `mutate_t02_2_5.py` |
 | Performance regressions | **0** | best-of-3, idle host |
 
 ### 3.2 Largest Modules
@@ -148,7 +149,7 @@ These were adopted as **choices**, not derivations, and are now in force.
 | `T02.2.2` Duplicate detection | ✅ **CLOSED 2026-08-19** — AC1 ✅ (E-V6 classified as DUPLICATE_ACQUISITION) AC2 ✅ (`held_duplicate`) AC3 ✅ (`duplicate_refusals`/`duplicate_rate`, fail-closed). Verifier 25/25; mutation 12/12 | — |
 | `T02.2.3` Drift detection | ✅ **CLOSED 2026-08-20** — AC1 ✅ (`detect`: N-15 mismatch against a named original) AC2 ✅ (`DriftRegister`, N-10 pattern) AC3 ✅ (supersession via store.transition **only on explicit fidelity declaration**; E-V6 ACTIVE-only enables re-acquisition). Verifier 26/26; mutation 13/13 | — |
 | `T02.2.4` Directive intake | 🟡 **UNBLOCKED 2026-08-19** (D-1 resolved, N-23 §5.5(i)) | Sequenced behind `T02.2.1`, `T01.6.1` |
-| `T02.2.5` Failure recording | 🟡 Sequenced behind `T02.2.1` | — |
+| `T02.2.5` Failure recording | ✅ **CLOSED 2026-08-20** — AC1 ✅ (every refusal first-class in AcquisitionLog **and** projected into the T01.1.7 FailureStore with N-10's six identifications) AC2 ✅ (`attempted` derived from stage: gate refusals precede the external act per N-21 §5.2). Verifier 23/23; mutation 12/12 | — |
 | `T02.3.1` P2 exit gate | 🔴 **BLOCKED** | Requires operational acquisition |
 
 ## 7. Active Blockers
@@ -216,6 +217,7 @@ python validation/verify_t02_1_2.py              # 27/27
 python validation/verify_t02_2_1.py              # 25/25
 python validation/verify_t02_2_2.py              # 25/25
 python validation/verify_t02_2_3.py              # 26/26
+python validation/verify_t02_2_5.py              # 23/23
 ```
 
 ## 11. Known Environment Constraints

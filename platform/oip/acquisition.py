@@ -34,6 +34,15 @@ Architecture References:
          The two confidence components are supplied explicitly by the
          Research Engine at acquisition and are never conflated; the IOM
          worked example records both on acquired Evidence.
+- T02.2.5 / N-10
+         Failure recording: every refusal is first-class data. Acquisition
+         failures are projected into the platform's FailureStore (the
+         N-10 home built at T01.1.7, co-located with configuration N-7)
+         with all six N-10 identifications, and carry the not-found vs
+         not-attempted distinction N-10 makes mandatory: gate refusals
+         precede the external act (N-21 S 5.2) and are NOT attempts;
+         duplicate and store refusals happen after material is in hand
+         and ARE attempts.
 - M-01   Gate 1 (scope) is DELIBERATELY ABSENT: directives are T02.2.4
          and the triggering question is open. This module invents no
          scope rule and no directive vocabulary.
@@ -71,9 +80,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Callable, Iterator
 
-from oip.contract import Confidence, Explanation, UniversalAttributes, utc_now
+from oip.acceptance import FailureRecord, RuleOutcome, RuleResult
+from oip.contract import (
+    Confidence, Engine, Explanation, ObjectStatus, ObjectType,
+    UniversalAttributes, utc_now,
+)
 from oip.evidence import Evidence, EvidenceContent, Provenance, StorageMode
-from oip.enums import Engine, ObjectStatus, ObjectType
 from oip.rights import (
     RightsAssessment,
     RefusalRegister,
@@ -127,13 +139,22 @@ class AcquisitionStage(str, Enum):
 
 @dataclass(frozen=True)
 class AcquisitionFailure:
-    """One recorded acquisition failure. Never silent. [AC2, N-10]"""
+    """One recorded acquisition failure. Never silent. [AC2, N-10]
+
+    T02.2.5: the record identifies the configuration in force
+    (N-10's fourth identification -- the request carries it), the engine
+    is Research by create authority (K8: `engine` property), and the
+    not-found vs not-attempted distinction N-10 makes mandatory is
+    carried by `attempted` -- derived from the stage, never asserted, so
+    the two can never disagree.
+    """
 
     source_identifier: str
     stage: AcquisitionStage
     reason: str
     detail: str
     failed_at: datetime
+    engine_configuration_ref: str = ""
 
     def __post_init__(self) -> None:
         if not (self.source_identifier or "").strip():
@@ -151,6 +172,66 @@ class AcquisitionFailure:
             )
         if not isinstance(self.failed_at, datetime):
             raise AcquisitionError("failed_at must be a datetime")
+        if not (self.engine_configuration_ref or "").strip():
+            raise AcquisitionError(
+                "a failure record identifies the configuration in force "
+                "[N-10]; the request's engine_configuration_ref is "
+                "required, never blank"
+            )
+
+    @property
+    def engine(self) -> "Engine":
+        """The failing engine: Research, by create authority. [K8, N-10]"""
+        return Engine.RESEARCH
+
+    @property
+    def attempted(self) -> bool:
+        """N-10's mandatory distinction: was the external act attempted?
+
+        Gate refusals (request validation, resolution, gate 2 typability,
+        gate 3 rights) happen BEFORE the external act -- enforcement
+        precedes acquisition (N-21 S 5.2) -- so nothing was attempted and
+        the failure means NOT-ATTEMPTED. Duplicate (E-V6) and store
+        refusals happen after material is in hand: the attempt was made
+        and failed, meaning ATTEMPTED-AND-FAILED. Derived from the
+        stage so the classification cannot drift from the record.
+        """
+        return self.stage in (
+            AcquisitionStage.DUPLICATE_ACQUISITION,
+            AcquisitionStage.STORE_REJECTED,
+        )
+
+    def as_failure_record(
+        self,
+        cycle_id: int | None = None,
+        invocation_index: int | None = None,
+    ) -> "FailureRecord":
+        """Project into the platform's N-10 failure-record shape.
+
+        Mirrors Orchestration's convention (T01.6.3): object_id names the
+        engine because no object was produced; the single rule result
+        carries the acquisition nature (stage + reason) -- a projection
+        label, not a ratified acceptance rule. Invocation identity is
+        optional exactly as N-10's precedent records it: only an
+        orchestrated invocation HAS one.
+        """
+        return FailureRecord(
+            object_id=f"engine:{self.engine.value}",
+            object_type=ObjectType.EVIDENCE,
+            failed_rules=(
+                RuleResult(
+                    "ACQUISITION-FAILURE",
+                    RuleOutcome.FAIL,
+                    f"{self.stage.value}/{self.reason}: {self.detail}",
+                ),
+            ),
+            recorded_at=self.failed_at,
+            engine_configuration_ref=self.engine_configuration_ref,
+            engine=self.engine,
+            cycle_id=cycle_id,
+            invocation_index=invocation_index,
+            input_ids=(self.source_identifier,),
+        )
 
 
 @dataclass
@@ -158,16 +239,33 @@ class AcquisitionLog:
     """Append-only register of acquisition failures. [AC2, N-10]
 
     Failure records live outside the object model, exactly as N-10
-    requires; nothing here ever enters the lineage graph."""
+    requires; nothing here ever enters the lineage graph.
+
+    T02.2.5: attach the platform FailureStore (T01.1.7's N-10 home,
+    co-located with configuration per N-7) and every appended failure is
+    projected there too, so Orchestration -- which reads failure records
+    for scheduling and idempotence -- can see acquisition refusals
+    instead of them dying in a side register."""
 
     _failures: list[AcquisitionFailure] = field(
         default_factory=list, init=False
     )
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
+    _failure_store: "FailureStore | None" = field(default=None, init=False)
+
+    def attach(self, failure_store: "FailureStore") -> None:  # noqa: F821
+        """Project every failure into the platform's N-10 store. [T02.2.5]"""
+        with self._lock:
+            self._failure_store = failure_store
 
     def append(self, failure: AcquisitionFailure) -> AcquisitionFailure:
         with self._lock:
             self._failures.append(failure)
+            store = self._failure_store
+        if store is not None:
+            # Projected outside the log lock: the FailureStore guards
+            # itself, and projection can never deadlock the register.
+            store.record(failure.as_failure_record())
         return failure
 
     def __len__(self) -> int:
@@ -286,6 +384,11 @@ def _failure(
             reason=reason,
             detail=detail,
             failed_at=now,
+            engine_configuration_ref=(
+                request.engine_configuration_ref
+                if isinstance(request, AcquisitionRequest)
+                else "unknown: malformed request"
+            ),
         )
     )
 
