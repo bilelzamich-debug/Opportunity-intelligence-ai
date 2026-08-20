@@ -55,12 +55,12 @@ supersessions.** No frozen document was rewritten.
 
 | Metric | Value | How verified |
 |---|---|---|
-| Production modules | **31** | `ls oip/*.py \| wc -l` |
-| Production lines | **19,492** | `wc -l oip/*.py` |
-| Test files | **39** | `ls tests/*.py \| wc -l` |
-| Unit tests | **3,281 passing** | `pytest -q` |
+| Production modules | **32** | `ls oip/*.py \| wc -l` |
+| Production lines | **19,971** | `wc -l oip/*.py` |
+| Test files | **40** | `ls tests/*.py \| wc -l` |
+| Unit tests | **3,313 passing** | `pytest -q` |
 | Stress tests | **128 passing** | `pytest -q -m stress` |
-| **Total tests** | **3,409 passing, 0 failing** | both suites |
+| **Total tests** | **3,441 passing, 0 failing** | both suites |
 | Total coverage | **99.0%** | `pytest --cov=oip` |
 | Modules below 95% | **0** | mechanical per-module check |
 | Architecture verifiers | **443 checks passing** | 8 verifier scripts |
@@ -68,6 +68,7 @@ supersessions.** No frozen document was rewritten.
 | Mutation score (source) | **21/21 killed** | `mutate_t02_1_1.py` |
 | Mutation score (coverage) | **14/14 killed** | `mutate_t02_1_4.py` |
 | Mutation score (rights) | **14/14 killed** | `mutate_t02_1_2.py` |
+| Mutation score (acquisition) | **15/15 killed** | `mutate_t02_2_1.py` |
 | Performance regressions | **0** | best-of-3, idle host |
 
 ### 3.2 Largest Modules
@@ -141,7 +142,7 @@ These were adopted as **choices**, not derivations, and are now in force.
 | `T02.1.2` Licensing & access policy | ✅ **CLOSED 2026-08-19** — AC1 ✅ AC2 ✅ AC3 ✅ (`oip/rights.py`; verifier 27/27; mutation 14/14). Mechanism delivered; operational when the role supplies assessments and acquisition (`T02.2.1`) exists | Role assessments awaited (organisational) |
 | `T02.1.3` Independence grouping | ✅ **CLOSED 2026-08-19** — explicit-input model; existing code + tests are the evidence | — |
 | `T02.1.4` Coverage model | ✅ **CLOSED 2026-08-19** — AC1 ✅ AC2 ✅ AC3 ✅ (`oip/coverage.py`; verifier 33/33; mutation 14/14) | — |
-| `T02.2.1` Acquisition | 🟡 Sequenced behind `T02.1.2` | — |
+| `T02.2.1` Acquisition | ✅ **CLOSED 2026-08-19** — AC1 ✅ AC2 ✅ AC3 ✅ (`oip/acquisition.py`; verifier 25/25; mutation 15/15). Gate order per N-20 §5.2.1 (gate 1 deliberately absent: M-01/T02.2.4); duplicate refusals delegated to E-V6 at acceptance | — |
 | `T02.2.2` Duplicate detection | 🟡 Sequenced behind `T02.2.1` | — |
 | `T02.2.3` Drift detection | 🟡 Sequenced behind `T02.2.2` | — |
 | `T02.2.4` Directive intake | 🟡 **UNBLOCKED 2026-08-19** (D-1 resolved, N-23 §5.5(i)) | Sequenced behind `T02.2.1`, `T01.6.1` |
@@ -210,6 +211,7 @@ python validation/exit_gate_t01_8_1_rerun.py     # 94/94
 python validation/verify_t02_1_1.py              # 38/38
 python validation/verify_t02_1_4.py              # 33/33
 python validation/verify_t02_1_2.py              # 27/27
+python validation/verify_t02_2_1.py              # 25/25
 ```
 
 ## 11. Known Environment Constraints

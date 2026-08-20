@@ -15,8 +15,13 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T02.2.1` (acquisition — its dependency
-`T02.1.2` is closed; sequencing complete). ~~`T02.1.2`~~ — ✅ **CLOSED
+**What is executable now:** `T02.2.2` (duplicate detection), `T02.2.3`
+(drift), `T02.2.5` (failure recording) — all sequenced behind `T02.2.1`,
+now closed. ~~`T02.2.1`~~ — ✅ **CLOSED 2026-08-19**: `oip/acquisition.py`
+produces Evidence with complete provenance through the ratified gate order
+(typability → rights; gate 1 deferred to T02.2.4 per M-01), records every
+failure (N-10), and requires capture_fidelity per acquisition. Suite
+3,313; verifier 25/25; mutation 15/15. ~~`T02.1.2`~~ — ✅ **CLOSED
 2026-08-19**: `oip/rights.py` implements N-21 §5 + N-24 (closed vocabulary;
 fail-closed gate 3; one-reason refusals; §5.7 storage modes; §5.9
 access_conditions composition; no rights store). Operational the moment the
@@ -144,7 +149,7 @@ against the ratified corpus, not merely the backlog's declared edges.
 | 2 | `T02.1.1` complete AC1/AC2 | ✅ **DONE 2026-08-19** | `SourceType` populated exactly from N-20 §5.1; the verifier matches the enum to the decision table mechanically (38/38; mutation 21/21). **AC3 stays blocked** on M-02/M-43 |
 | 3 | `T02.1.4` Coverage model | ✅ **CLOSED 2026-08-19** | `oip/coverage.py`: AC1 coverage measurable · AC2 explicit declarations · AC3 inheritable by PT-V5. Verifier 33/33; mutation 14/14 |
 | 4 | `T02.1.2` Licensing enforcement | ✅ **CLOSED 2026-08-19** | `oip/rights.py`: gate 3 + vocabulary + storage modes + access_conditions. Verifier 27/27; mutation 14/14 |
-| 5 | `T02.2.1` Acquisition | 🟡 Sequenced | Depends on `T02.1.2` |
+| 5 | `T02.2.1` Acquisition | ✅ **CLOSED 2026-08-19** | `oip/acquisition.py`; verifier 25/25; mutation 15/15 |
 | 6 | `T02.2.2` Duplicate detection | 🟡 Sequenced | E-V6 already implemented in P1; needs acquired Evidence |
 | 7 | `T02.2.3` Drift detection | 🟡 Sequenced | Specification complete (N-15 binds it) |
 | 8 | `T02.2.5` Failure recording | 🟡 Sequenced | Specification complete (N-10) |

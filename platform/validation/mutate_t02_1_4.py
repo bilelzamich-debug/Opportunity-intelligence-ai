@@ -15,6 +15,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+# ROOT-CAUSE HARDENING (discovered during T02.2.1 validation): a restored
+# source within the same mtime second can be served with STALE MUTATED
+# bytecode from __pycache__. Never write bytecode during mutation runs,
+# and purge the cache around every write so each suite sees the real file.
+PYCACHE = Path(__file__).resolve().parents[1] / "oip" / "__pycache__"
+
+
+def _purge_pycache() -> None:
+    shutil.rmtree(PYCACHE, ignore_errors=True)
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "oip" / "coverage.py"
 
@@ -85,9 +95,11 @@ MUTATIONS = [
 
 
 def _run() -> int:
+    _purge_pycache()
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "-x", "-q", "tests/test_coverage.py"],
         cwd=ROOT, capture_output=True, text=True, timeout=300,
+        env={**__import__("os").environ, "PYTHONDONTWRITEBYTECODE": "1"},
     )
     return proc.returncode
 
@@ -133,6 +145,7 @@ def main() -> int:
                 print(f"  killed    {label}")
         finally:
             path.write_text(original)
+            _purge_pycache()
 
     SRC.write_text(original)
     identical = SRC.read_text() == backup.read_text()

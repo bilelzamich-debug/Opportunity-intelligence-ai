@@ -42,7 +42,7 @@ python -c "import hypothesis, pytest_cov" 2>/dev/null \
 cd "$PLATFORM"
 
 hdr "Test suites"
-chk "unit suite (expect 3281 passed)" "3281 passed" \
+chk "unit suite (expect 3313 passed)" "3313 passed" \
     python -m pytest -q
 if (( FULL )); then
   chk "stress suite (expect 128 passed, ~17 min)" "128 passed" \
@@ -72,6 +72,7 @@ hdr "Phase 2 verifiers"
 chk "verify_t02_1_1 source model (38)"    "38/38"   python validation/verify_t02_1_1.py
 chk "verify_t02_1_4 coverage model (33)"  "33/33"   python validation/verify_t02_1_4.py
 chk "verify_t02_1_2 rights model (27)"    "27/27"   python validation/verify_t02_1_2.py
+chk "verify_t02_2_1 acquisition (25)"     "25/25"   python validation/verify_t02_2_1.py
 # verify_t02_1_1_blocker.py asserted M-16 was OPEN. N-20 has since closed it
 # partially, so the verifier is historically true but currently false by
 # design. Archived to validation/superseded/ rather than deleted.
@@ -85,6 +86,7 @@ if (( FULL )); then
   chk "source model (expect 21/21 killed)"  "killed 21/21" python validation/mutate_t02_1_1.py
   chk "coverage model (expect 14/14 killed)" "killed 14/14" python validation/mutate_t02_1_4.py
   chk "rights model (expect 14/14 killed)"  "killed 14/14" python validation/mutate_t02_1_2.py
+  chk "acquisition (expect 15/15 killed)"  "killed 15/15" python validation/mutate_t02_2_1.py
   chk "cascade (19/20, survivor equivalent)" "killed 19/20" python validation/mutate_t01_2_4_r1.py
   hdr "Source integrity after mutation"
   chk "no mutation residue in oip/" "" bash -c '! grep -rqE "if False:|for _once in" oip/*.py'
