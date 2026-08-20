@@ -84,7 +84,7 @@ N-22 (coverage) · N-23 (research trigger).
 | `T02.1.4` Coverage model | ✅ **CLOSED 2026-08-19** (oip/coverage.py; 33/33; 14/14) |
 | `T02.2.1` Acquisition | ✅ **CLOSED 2026-08-19** (oip/acquisition.py; 25/25; 15/15) |
 | `T02.2.2` Duplicate detection | ✅ **CLOSED 2026-08-19** (oip/duplicates.py; 25/25; 12/12) |
-| `T02.2.3` Drift detection | 🟡 Sequenced |
+| `T02.2.3` Drift detection | ✅ **CLOSED 2026-08-20** (oip/drift.py; 26/26; 13/13) |
 | `T02.2.4` Directive intake | 🟡 **Unblocked 2026-08-19** (D-1 resolved, N-23 §5.5(i)) |
 | `T02.2.5` Failure recording | 🟡 Sequenced |
 | `T02.3.1` P2 exit gate | 🔴 **BLOCKED** |

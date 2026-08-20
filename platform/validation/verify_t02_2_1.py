@@ -268,8 +268,8 @@ check("F", "records are frozen dataclasses [R-1]",
       SRC.count("@dataclass(frozen=True)") >= 2)
 check("F", "the failure log is lock-guarded [N-11]",
       "threading.RLock" in SRC)
-check("F", "production module count is now 33 (incl. duplicates)",
-      len(list((ROOT / "oip").glob("*.py"))) == 33,
+check("F", "production module count is now 34 (incl. drift)",
+      len(list((ROOT / "oip").glob("*.py"))) == 34,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("F", "Phase 1 modules unchanged",
       __import__("hashlib").md5(

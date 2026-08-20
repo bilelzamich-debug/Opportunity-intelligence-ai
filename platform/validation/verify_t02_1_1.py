@@ -210,8 +210,8 @@ check("E", "integrity.py unchanged",
       __import__("hashlib").md5(
           (ROOT / "oip" / "integrity.py").read_bytes()).hexdigest()
       == "42f1a9507b9679a25cfef9321a07fa6a")
-check("E", "exactly five Phase-2 modules exist (through duplicates)",
-      len(list((ROOT / "oip").glob("*.py"))) == 33,
+check("E", "exactly six Phase-2 modules exist (through drift)",
+      len(list((ROOT / "oip").glob("*.py"))) == 34,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 
 # ===========================================================================

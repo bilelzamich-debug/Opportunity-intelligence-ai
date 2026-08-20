@@ -199,9 +199,13 @@ class TestAssessment:
         assert permitted(
             valid_until=FIXED_NOW - timedelta(days=1)
         ).is_admissible is False
-        assert permitted(
-            valid_until=FIXED_NOW + timedelta(days=1)
-        ).is_admissible is True
+        # Positive-expiry case verified through the CLOCK-INJECTABLE gate:
+        # a bare is_admissible() call reads the wall clock, and a fixed
+        # future date would detonate once real time passes it (found the
+        # hard way on 2026-08-20).
+        future = permitted(valid_until=FIXED_NOW + timedelta(days=1))
+        assert future.is_expired(now=FIXED_NOW) is False
+        assert evaluate_gate(future, now=FIXED_NOW).admitted is True
         # Mixed: acquisition UNASSESSED never becomes admissible just
         # because retention is generous.
         mixed = RightsAssessment(
