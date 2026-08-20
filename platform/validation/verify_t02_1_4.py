@@ -189,8 +189,8 @@ check("G", "module header names its task",
       re.search(r"Task: T02\.1\.4", SRC) is not None)
 check("G", "module does not claim to close a marker",
       not re.search(r"\bCloses\s*[:|]\s*M-\d+", SRC))
-check("G", "production module count is now 30 (source + coverage)",
-      len(list((ROOT / "oip").glob("*.py"))) == 30,
+check("G", "production module count is now 31 (source, coverage, rights)",
+      len(list((ROOT / "oip").glob("*.py"))) == 31,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("G", "Phase 1 modules unchanged",
       __import__("hashlib").md5(
