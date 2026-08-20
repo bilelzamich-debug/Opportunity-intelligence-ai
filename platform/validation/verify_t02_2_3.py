@@ -24,6 +24,10 @@ from oip.acquisition import (  # noqa: E402
     AcquisitionLog, AcquisitionRequest, acquire,
 )
 from oip.coverage import OutOfFrameRegister  # noqa: E402
+from oip.directives import (  # noqa: E402
+    Directive, DirectiveRegistry, Originator,
+)
+
 from oip.drift import (  # noqa: E402
     Disposition, DriftError, DriftRegister, NotDriftError, detect,
     record_drift,
@@ -92,6 +96,13 @@ def _rig():
     store = KnowledgeStore()
     log = AcquisitionLog()
     drifts = DriftRegister()
+    directives = DirectiveRegistry()
+    directives.raise_directive(Directive(
+        directive_id="dir-v", originator=Originator.EXTERNAL_COMMISSION,
+        authority="verifier-owner", description="verifier scope",
+        targets=("src-a",), raised_at=T0 - timedelta(days=2),
+    ))
+    directives.effect("dir-v", now=T0)
 
     def _acquire(content, fidelity="full text preserved"):
         request = AcquisitionRequest(
@@ -109,6 +120,7 @@ def _rig():
             request, registry=registry, store=store,
             out_of_frame=OutOfFrameRegister(),
             refusals=RefusalRegister(), log=log,
+            directives=directives,
             assessment=RightsAssessment(
                 source_identifier="src-a",
                 acquisition=AcquisitionRight.PERMITTED,
@@ -120,7 +132,7 @@ def _rig():
             clock=lambda: T0,
         )
 
-    return store, drifts, _acquire
+    return store, drifts, _acquire  # directives closed over
 
 
 # ===========================================================================
@@ -242,8 +254,8 @@ check("E", "no rights, coverage or gate logic (T02.1.2/T02.1.4/T02.2.1)",
 check("E", "records are frozen dataclasses [R-1]",
       SRC.count("@dataclass(frozen=True)") >= 2)
 check("E", "the register is lock-guarded [N-11]", "threading.RLock" in SRC)
-check("E", "production module count is now 34",
-      len(list((ROOT / "oip").glob("*.py"))) == 34,
+check("E", "production module count is now 35 (incl. directives)",
+      len(list((ROOT / "oip").glob("*.py"))) == 35,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("E", "Phase 1 modules unchanged",
       __import__("hashlib").md5(

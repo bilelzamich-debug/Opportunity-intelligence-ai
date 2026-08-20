@@ -27,6 +27,9 @@ from oip.acquisition import (  # noqa: E402
     AcquisitionRequest, AcquisitionStage, acquire,
 )
 from oip.coverage import OutOfFrameRegister  # noqa: E402
+from oip.directives import (  # noqa: E402
+    Directive, DirectiveRegistry, Originator,
+)
 from oip.evidence import StorageMode, Evidence  # noqa: E402
 from oip.rights import (  # noqa: E402
     RIGHTS_AUTHORITY_ROLE, AcquisitionRight, RefusalRegister,
@@ -78,8 +81,15 @@ def _rig():
     registry = SourceRegistry()
     registry.register("src-a", "VENDOR_PUBLICATION")
     registry.register("src-u", "mystery-channel")
-    return registry, KnowledgeStore(), OutOfFrameRegister(), (
-        RefusalRegister()), AcquisitionLog()
+    directives = DirectiveRegistry()
+    directives.raise_directive(Directive(
+        directive_id="dir-v", originator=Originator.EXTERNAL_COMMISSION,
+        authority="verifier-owner", description="verifier scope",
+        targets=("src-a", "src-u", "src-unreg"), raised_at=T0 - timedelta(days=2),
+    ))
+    directives.effect("dir-v", now=T0)
+    return (registry, KnowledgeStore(), OutOfFrameRegister(),
+            RefusalRegister(), AcquisitionLog(), directives)
 
 
 def _request(**overrides):
@@ -122,12 +132,12 @@ check("A", "the module does not claim to close a marker",
 # ===========================================================================
 # B. AC1 -- provenance complete  [IOM S 3.1 / E-V2]
 # ===========================================================================
-_reg, _store, _oof, _ref, _log = _rig()
+_reg, _store, _oof, _ref, _log, _dirs = _rig()
 _ev = acquire(
     _request(),
     registry=_reg, store=_store, out_of_frame=_oof,
     refusals=_ref, log=_log, assessment=_permitted(),
-    clock=lambda: T0,
+    directives=_dirs, clock=lambda: T0,
 )
 check("B", "AC1: every required provenance field is present and non-empty",
       all(
@@ -152,7 +162,7 @@ check("B", "the storage-mode mapping matches the N-21 S 5.7 table exactly",
               content_fingerprint="sha256:" + "0" * 64,
           ),
           registry=_reg, store=_store, out_of_frame=_oof,
-          refusals=_ref, log=_log,
+          refusals=_ref, log=_log, directives=_dirs,
           assessment=_permitted(RetentionRight.RETAIN_REFERENCE_ONLY),
           clock=lambda: T0,
       ).content.storage_mode is StorageMode.REFERENCE)
@@ -160,7 +170,7 @@ check("B", "independence group is carried, never inferred (T02.1.3)",
       acquire(
           _request(independence_group="g1", content="distinct material"),
           registry=_reg, store=_store, out_of_frame=_oof,
-          refusals=_ref, log=_log, assessment=_permitted(),
+          refusals=_ref, log=_log, directives=_dirs, assessment=_permitted(),
           clock=lambda: T0,
       ).provenance.source_independence_group == "g1")
 
@@ -168,19 +178,19 @@ check("B", "independence group is carried, never inferred (T02.1.3)",
 # C. AC2 -- failures recorded, not silent  [K10 / N-10]
 # ===========================================================================
 def _refuses(request, assessment=None, source="src-a"):
-    reg, store, oof, ref, log = _rig()
+    reg, store, oof, ref, log, dirs = _rig()
     try:
         acquire(
             request, registry=reg, store=store, out_of_frame=oof,
             refusals=ref, log=log, assessment=assessment,
-            clock=lambda: T0,
+            directives=dirs, clock=lambda: T0,
         )
-        return None, (reg, store, oof, ref, log)
+        return None, (reg, store, oof, ref, log, dirs)
     except AcquisitionRefusedError:
-        return True, (reg, store, oof, ref, log)
+        return True, (reg, store, oof, ref, log, dirs)
 
 
-_r, _w = _refuses(_request())  # unassessed
+_r, _w = _refuses(_request())  # unassessed  (rig inside _refuses)
 check("C", "AC2: UNASSESSED rights refuse with a recorded failure",
       _r is True and len(_w[4]) == 1
       and _w[4].for_source("src-a")[0].stage
@@ -195,9 +205,9 @@ check("C", "AC2: gate 2 precedes gate 3 (N-20 S 5.2.1 order)",
       and _w[3].__len__() == 0
       and _w[2].count() == 1,  # out-of-frame recorded, rights untouched
       f"rights_refusals={len(_w[3])} out_of_frame={_w[2].count()}")
-_r, _w = _refuses(_request(source_identifier="ghost"))
+_r, _w = _refuses(_request(source_identifier="src-unreg"))
 check("C", "AC2: an unregistered source refuses and records",
-      _r is True and _w[4].for_source("ghost")[0].stage
+      _r is True and _w[4].for_source("src-unreg")[0].stage
       is AcquisitionStage.UNREGISTERED_SOURCE)
 check("C", "every failure carries stage + reason + detail (N-10)",
       all(
@@ -236,9 +246,14 @@ check("D", "AC3: an empty fidelity statement is refused at construction",
 # ===========================================================================
 # E. Boundaries -- nothing invented
 # ===========================================================================
-check("E", "gate 1 (scope/directives) is deliberately absent (M-01)",
-      not re.search(r"directive|OUT_OF_SCOPE", CODE)
-      and "M-01" in SRC)
+# Updated when T02.2.4 closed: gate 1 now EXISTS (injected registry,
+# N-20 S 5.2.1 order). What must remain true here: acquisition never
+# AUTHORS or widens a directive (N-23 S 5.2: Research executes within
+# scope, never widens it) and no scheduling logic creeps in.
+check("E", "acquisition consumes scope; it never authors or schedules it",
+      "Directive(" not in CODE
+      and "raise_directive" not in CODE
+      and not re.search(r"schedule|work_set", CODE))
 # Narrowed when T02.2.2 closed: acquisition legitimately CLASSIFIES the
 # store's E-V6 refusal (DUPLICATE_ACQUISITION), but must not implement
 # duplicate DETECTION itself (that is oip/duplicates.py) nor any drift
@@ -268,8 +283,8 @@ check("F", "records are frozen dataclasses [R-1]",
       SRC.count("@dataclass(frozen=True)") >= 2)
 check("F", "the failure log is lock-guarded [N-11]",
       "threading.RLock" in SRC)
-check("F", "production module count is now 34 (incl. drift)",
-      len(list((ROOT / "oip").glob("*.py"))) == 34,
+check("F", "production module count is now 35 (incl. directives)",
+      len(list((ROOT / "oip").glob("*.py"))) == 35,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("F", "Phase 1 modules unchanged",
       __import__("hashlib").md5(

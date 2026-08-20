@@ -30,6 +30,7 @@ from hypothesis import assume, given
 from hypothesis import strategies as st
 
 from oip.acquisition import AcquisitionLog, AcquisitionRequest, acquire
+from oip.directives import Directive, DirectiveRegistry, Originator
 from oip.coverage import OutOfFrameRegister
 from oip.drift import (
     Disposition,
@@ -59,12 +60,25 @@ FIRST = "Vendor changelog v1: bulk edits fail silently above 50 SKUs."
 SECOND = "Vendor changelog v2: bulk edits fail silently above 200 SKUs."
 
 
+COVERED_TARGETS = ('src-a', 'src-b', 'src-c', 'src-u', 'src-u2', 'src-untypable')
+
+
 class Rig:
     def __init__(self):
         self.registry = SourceRegistry()
         self.registry.register("src-a", "VENDOR_PUBLICATION")
         self.store = KnowledgeStore()
         self.log = AcquisitionLog()
+        self.directives = DirectiveRegistry()
+        self.directives.raise_directive(Directive(
+            directive_id="dir-1",
+            originator=Originator.EXTERNAL_COMMISSION,
+            authority="commissioning-owner",
+            description="seller-side friction, segment A",
+            targets=COVERED_TARGETS,
+            raised_at=T0 - timedelta(days=2),
+        ))
+        self.directives.effect("dir-1", now=T0)
         self.drifts = DriftRegister()
 
     def acquire(self, content, fidelity="full text preserved"):
@@ -86,6 +100,7 @@ class Rig:
             out_of_frame=OutOfFrameRegister(),
             refusals=RefusalRegister(),
             log=self.log,
+            directives=self.directives,
             assessment=RightsAssessment(
                 source_identifier="src-a",
                 acquisition=AcquisitionRight.PERMITTED,

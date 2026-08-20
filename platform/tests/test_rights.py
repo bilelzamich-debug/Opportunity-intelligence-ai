@@ -224,6 +224,20 @@ class TestAssessment:
             "Designated Source Rights/Compliance Authority"
         )
 
+    def test_gate_three_admits_an_x_prefixed_source_too(self):
+        """Pinned boundary for the gate-invents-scope mutation guard:
+        gate 3 evaluates RIGHTS only -- no identifier-based scope
+        screening may exist in the rights module."""
+        assessment = RightsAssessment(
+            source_identifier="x-something",
+            acquisition=AcquisitionRight.PERMITTED,
+            retention=RetentionRight.RETAIN_FULL,
+            authority=RIGHTS_AUTHORITY_ROLE,
+            basis="b",
+            assessed_at=FIXED_NOW - timedelta(days=1),
+        )
+        assert evaluate_gate(assessment, now=FIXED_NOW).admitted is True
+
     @given(source=IDENT)
     def test_gate_three_admits_any_well_formed_permitted_source(
         self, source

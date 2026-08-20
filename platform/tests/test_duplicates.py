@@ -33,6 +33,7 @@ from oip.acquisition import (
     AcquisitionStage,
     acquire,
 )
+from oip.directives import Directive, DirectiveRegistry, Originator
 from oip.coverage import OutOfFrameRegister
 from oip.duplicates import (
     DuplicateError,
@@ -56,6 +57,9 @@ T0 = datetime(2026, 8, 19, 12, 0, 0, tzinfo=timezone.utc)
 MATERIAL = "Vendor changelog: bulk edits silently fail above 50 SKUs."
 
 
+COVERED_TARGETS = ('src-a', 'src-b', 'src-c', 'src-u', 'src-u2', 'src-untypable')
+
+
 class Rig:
     def __init__(self):
         self.registry = SourceRegistry()
@@ -63,6 +67,16 @@ class Rig:
         self.registry.register("src-b", "VENDOR_PUBLICATION")
         self.store = KnowledgeStore()
         self.log = AcquisitionLog()
+        self.directives = DirectiveRegistry()
+        self.directives.raise_directive(Directive(
+            directive_id="dir-1",
+            originator=Originator.EXTERNAL_COMMISSION,
+            authority="commissioning-owner",
+            description="seller-side friction, segment A",
+            targets=COVERED_TARGETS,
+            raised_at=T0 - timedelta(days=2),
+        ))
+        self.directives.effect("dir-1", now=T0)
 
     def request(self, source="src-a", content=MATERIAL, **ov):
         base = dict(
@@ -100,6 +114,7 @@ class Rig:
             out_of_frame=OutOfFrameRegister(),
             refusals=RefusalRegister(),
             log=self.log,
+            directives=self.directives,
             assessment=assessment,
             clock=lambda: T0,
         )

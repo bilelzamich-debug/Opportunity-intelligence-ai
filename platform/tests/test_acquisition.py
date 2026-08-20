@@ -38,6 +38,7 @@ from oip.acquisition import (
     AcquisitionStage,
     acquire,
 )
+from oip.directives import Directive, DirectiveRegistry, Originator
 from oip.coverage import OutOfFrameRegister
 from oip.evidence import StorageMode
 from oip.rights import (
@@ -55,6 +56,9 @@ IDENT = st.text(min_size=1, max_size=20).filter(str.strip)
 FIDELITY = st.text(min_size=5, max_size=60).filter(str.strip)
 
 
+COVERED_TARGETS = ('src-a', 'src-b', 'src-c', 'src-u', 'src-u2', 'src-untypable')
+
+
 class Rig:
     """One acquisition wiring: registry, store, registers, log, clock."""
 
@@ -66,6 +70,16 @@ class Rig:
         self.out_of_frame = OutOfFrameRegister()
         self.refusals = RefusalRegister()
         self.log = AcquisitionLog()
+        self.directives = DirectiveRegistry()
+        self.directives.raise_directive(Directive(
+            directive_id="dir-1",
+            originator=Originator.EXTERNAL_COMMISSION,
+            authority="commissioning-owner",
+            description="seller-side friction, segment A",
+            targets=COVERED_TARGETS,
+            raised_at=T0 - timedelta(days=2),
+        ))
+        self.directives.effect("dir-1", now=T0)
 
     def request(self, **overrides) -> AcquisitionRequest:
         base = dict(
@@ -102,6 +116,7 @@ class Rig:
             out_of_frame=self.out_of_frame,
             refusals=self.refusals,
             log=self.log,
+            directives=self.directives,
             assessment=assessment,
             clock=lambda: T0,
         )
@@ -268,11 +283,24 @@ class TestCaptureFidelity:
 
 class TestFailuresRecorded:
     def test_unregistered_source_refuses_and_records(self, rig):
+        # src-c is covered by the directive (gate 1 admits) but is not
+        # registered: resolution then refuses. "nope" would refuse at
+        # gate 1 first (scope precedes resolution, N-20 S 5.2.1).
         with pytest.raises(AcquisitionRefusedError):
-            rig.acquire(rig.request(source_identifier="nope"))
+            rig.acquire(rig.request(source_identifier="src-c"))
         assert len(rig.log) == 1
         failure = next(iter(rig.log))
         assert failure.stage is AcquisitionStage.UNREGISTERED_SOURCE
+
+    def test_uncovered_target_refuses_at_gate_one(self, rig):
+        """T02.2.4 AC3: no IN_EFFECT directive covers the target."""
+        with pytest.raises(AcquisitionRefusedError) as exc:
+            rig.acquire(rig.request(source_identifier="nope"))
+        assert "OUT_OF_SCOPE" in str(exc.value)
+        assert rig.log.for_source("nope")[0].stage is (
+            AcquisitionStage.OUT_OF_SCOPE
+        )
+        assert len(rig.store) == 0
 
     def test_type_mismatch_refuses_and_records(self, rig):
         rig.registry.register("src-b", "VENDOR_PUBLICATION")
@@ -492,7 +520,17 @@ class TestRequestValidation:
 
     @given(source=IDENT)
     def test_identifiers_are_carried_faithfully(self, source):
+        from oip.directives import Directive, Originator
         rig = Rig()
+        rig.directives.raise_directive(Directive(
+            directive_id=f"dir-{source!r}",
+            originator=Originator.EXTERNAL_COMMISSION,
+            authority="commissioning-owner",
+            description="property scope",
+            targets=(source,),
+            raised_at=T0 - timedelta(days=1),
+        ))
+        rig.directives.effect(f"dir-{source!r}", now=T0)
         rig.registry.register(source, "VENDOR_PUBLICATION")
         assessment = RightsAssessment(
             source_identifier=source,

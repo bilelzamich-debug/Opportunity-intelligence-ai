@@ -125,9 +125,11 @@ class AcquisitionRefusedError(AcquisitionError):
 class AcquisitionStage(str, Enum):
     """Why an acquisition attempt refused. Closed set; one per attempt.
 
-    Order mirrors the evaluation sequence: request validation, source
-    resolution, gate 2 (typability), gate 3 (rights), persistence."""
+    Order mirrors the ratified evaluation sequence (N-20 S 5.2.1):
+    gate 1 (scope), request validation, source resolution, gate 2
+    (typability), gate 3 (rights), persistence."""
 
+    OUT_OF_SCOPE = "OUT_OF_SCOPE"
     INVALID_REQUEST = "INVALID_REQUEST"
     UNREGISTERED_SOURCE = "UNREGISTERED_SOURCE"
     SOURCE_TYPE_MISMATCH = "SOURCE_TYPE_MISMATCH"
@@ -417,6 +419,12 @@ def acquire(
     *,
     registry: SourceRegistry,
     store: KnowledgeStore,
+    # Annotation-only dependency (exit-gate import budget): consumed
+    # through its ratified surface (covers), contract pinned by tests
+    # and the verifier. None behaves as an EMPTY registry: gate 1 then
+    # refuses everything -- acquisition occurs only under an IN_EFFECT
+    # directive (N-23 S 5.2), so absence is fail-closed, never open.
+    directives: "DirectiveRegistry | None" = None,
     # Annotation-only dependency, deliberately NOT imported at runtime: the
     # exit gate fixes non-store modules at <=6 oip imports, and the coverage
     # register is consumed through its ratified surface (record/count) --
@@ -441,14 +449,39 @@ def acquire(
     """
     now = clock()
 
-    # -- a request is fully validated at CONSTRUCTION (its __post_init__
-    # refuses malformed fields, so nothing malformed reaches this far);
-    # a non-request argument is a programming error, not an acquisition
-    # attempt, and is refused loudly without touching the log. [AC2]
+    # -- a non-request argument is a programming error, refused before
+    # any gate touches it. [AC2 of silence]
     if not isinstance(request, AcquisitionRequest):
         raise AcquisitionError(
             f"expected an AcquisitionRequest, got {request!r}"
         )
+
+    # -- gate 1: scope. [N-20 S 5.2.1; N-23 S 5.2 -- AC1, AC3]
+    # The FIRST gate of the ratified sequence, before resolution,
+    # typability and rights: acquisition occurs only under an IN_EFFECT
+    # directive, and one refusal reason is produced (halt-on-first).
+    # Duck-typed at the ratified surface (covers) to keep the module
+    # import budget within the exit gate; the registry's contract is
+    # pinned by tests and verify_t02_2_4.
+    covering = (
+        directives.covers(request.source_identifier, now)
+        if directives is not None
+        else None
+    )
+    if covering is None:
+        failure = _failure(
+            request, request.source_identifier,
+            AcquisitionStage.OUT_OF_SCOPE, "OUT_OF_SCOPE",
+            "no IN_EFFECT directive covers this target; acquisition "
+            "occurs only under one [N-20 S 5.2.1 gate 1, N-23 S 5.2] -- "
+            "the refusal is recorded, never silent [G16]", log, now,
+        )
+        raise _refuse(failure)
+
+    # -- a request is fully validated at CONSTRUCTION (its __post_init__
+    # refuses malformed fields, so nothing malformed reaches this far).
+    # The non-request guard now runs BEFORE gate 1 (moved when gate 1
+    # became the first evaluation).
 
     # -- source resolution: the registry is what the platform knows. [N-04]
     try:
@@ -540,13 +573,15 @@ def acquire(
         explanation=Explanation(
             objects_referenced=(request.source_identifier,),
             criteria_applied=(
+                "gate-1 scope: " + covering.directive_id,
                 "gate-2 typability: " + member.value,
                 "gate-3 rights: " + decision.storage_mode.value,
             ),
             reasoning=(
                 f"Acquired from {request.source_identifier!r} by "
-                f"{request.acquisition_method}; fidelity: "
-                f"{request.capture_fidelity}"
+                f"{request.acquisition_method} under research directive "
+                f"{covering.directive_id!r} ({covering.description}); "
+                f"fidelity: {request.capture_fidelity}"
             ),
         ),
         evidence_reachable=True,

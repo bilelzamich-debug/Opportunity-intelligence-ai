@@ -24,6 +24,9 @@ from oip.acquisition import (  # noqa: E402
     AcquisitionStage, acquire,
 )
 from oip.coverage import OutOfFrameRegister  # noqa: E402
+from oip.directives import (  # noqa: E402
+    Directive, DirectiveRegistry, Originator,
+)
 from oip.duplicates import (  # noqa: E402
     DuplicateError, duplicate_rate, duplicate_refusals, held_duplicate,
 )
@@ -81,11 +84,18 @@ def _rig():
     registry.register("src-b", "VENDOR_PUBLICATION")
     store = KnowledgeStore()
     log = AcquisitionLog()
-    return registry, store, log
+    directives = DirectiveRegistry()
+    directives.raise_directive(Directive(
+        directive_id="dir-v", originator=Originator.EXTERNAL_COMMISSION,
+        authority="verifier-owner", description="verifier scope",
+        targets=("src-a", "src-b"), raised_at=T0 - timedelta(days=2),
+    ))
+    directives.effect("dir-v", now=T0)
+    return registry, store, log, directives
 
 
-def _acquire(registry, store, log, source="src-a", content="material",
-             retention=RetentionRight.RETAIN_FULL):
+def _acquire(registry, directives, store, log, source="src-a",
+             content="material", retention=RetentionRight.RETAIN_FULL):
     request = AcquisitionRequest(
         source_identifier=source,
         source_type="VENDOR_PUBLICATION",
@@ -104,6 +114,7 @@ def _acquire(registry, store, log, source="src-a", content="material",
         out_of_frame=OutOfFrameRegister(),
         refusals=RefusalRegister(),
         log=log,
+        directives=directives,
         assessment=RightsAssessment(
             source_identifier=source,
             acquisition=AcquisitionRight.PERMITTED,
@@ -138,11 +149,11 @@ check("A", "the module refuses to default an empty history",
 # ===========================================================================
 # B. AC1 -- same fingerprint plus source rejected (classified)
 # ===========================================================================
-_reg, _store, _log = _rig()
-_first = _acquire(_reg, _store, _log, content="material")
+_reg, _store, _log, _dirs = _rig()
+_first = _acquire(_reg, _dirs, _store, _log, content="material")
 _refused = False
 try:
-    _acquire(_reg, _store, _log, content="material")
+    _acquire(_reg, _dirs, _store, _log, content="material")
 except Exception as exc:
     _refused = "E-V6" in str(exc)
 check("B", "AC1: re-acquiring identical material from the same source refuses",
@@ -155,9 +166,9 @@ check("B", "AC1: the refusal is classified DUPLICATE_ACQUISITION, not generic",
 check("B", "the store still holds exactly one copy",
       len(_store) == 1)
 check("B", "different material from the same source is NOT a duplicate",
-      isinstance(_acquire(_reg, _store, _log, content="different"),
+      isinstance(_acquire(_reg, _dirs, _store, _log, content="different"),
                  Evidence) and len(_store) == 2)
-_second_source = _acquire(_reg, _store, _log, source="src-b",
+_second_source = _acquire(_reg, _dirs, _store, _log, source="src-b",
                           content="material")
 check("B", "same material from another source is corroboration, not duplicate",
       isinstance(_second_source, Evidence) and len(_store) == 3
@@ -176,10 +187,10 @@ check("C", "detection is keyed by source (cross-source is not held)",
       and held_duplicate(_store, "src-a", content="material")
       != _second_source.object_id)
 _fp = "sha256:" + "cd" * 32
-_ref = _acquire(_reg, _store, _log, source="src-a", content=None,
+_ref = _acquire(_reg, _dirs, _store, _log, source="src-a", content=None,
                 retention=RetentionRight.RETAIN_REFERENCE_ONLY) if False else None
 # (reference-mode exercised through the full rig below)
-_reg2, _store2, _log2 = _rig()
+_reg2, _store2, _log2, _dirs2 = _rig()
 _req = AcquisitionRequest(
     source_identifier="src-a", source_type="VENDOR_PUBLICATION",
     acquisition_method="m", capture_fidelity="f", acquired_at=T0,
@@ -189,7 +200,7 @@ _req = AcquisitionRequest(
 )
 _ref_ev = acquire(
     _req, registry=_reg2, store=_store2, out_of_frame=OutOfFrameRegister(),
-    refusals=RefusalRegister(), log=_log2,
+    refusals=RefusalRegister(), log=_log2, directives=_dirs2,
     assessment=RightsAssessment(
         source_identifier="src-a", acquisition=AcquisitionRight.PERMITTED,
         retention=RetentionRight.RETAIN_REFERENCE_ONLY,
@@ -233,8 +244,8 @@ check("E", "no drift logic (T02.2.3 is untouched)",
       not re.search(r"drift", _dupe_src, re.I))
 check("E", "module header names its task",
       re.search(r"Task: T02\.2\.2", SRC_DUP) is not None)
-check("E", "production module count is now 34 (incl. drift)",
-      len(list((ROOT / "oip").glob("*.py"))) == 34,
+check("E", "production module count is now 35 (incl. directives)",
+      len(list((ROOT / "oip").glob("*.py"))) == 35,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("E", "Phase 1 modules unchanged",
       __import__("hashlib").md5(

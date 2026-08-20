@@ -38,6 +38,7 @@ from oip.acquisition import (
     acquire,
 )
 from oip.configuration import FailureStore
+from oip.directives import Directive, DirectiveRegistry, Originator
 from oip.coverage import OutOfFrameRegister
 from oip.duplicates import duplicate_refusals
 from oip.enums import Engine, ObjectType
@@ -55,6 +56,9 @@ T0 = datetime(2026, 8, 20, 12, 0, 0, tzinfo=timezone.utc)
 MATERIAL = "Vendor changelog: bulk edits fail silently above 50 SKUs."
 
 
+COVERED_TARGETS = ('src-a', 'src-b', 'src-c', 'src-u', 'src-u2', 'src-untypable')
+
+
 class Rig:
     def __init__(self):
         self.registry = SourceRegistry()
@@ -62,6 +66,16 @@ class Rig:
         self.registry.register("src-u", "mystery-channel")
         self.store = KnowledgeStore()
         self.log = AcquisitionLog()
+        self.directives = DirectiveRegistry()
+        self.directives.raise_directive(Directive(
+            directive_id="dir-1",
+            originator=Originator.EXTERNAL_COMMISSION,
+            authority="commissioning-owner",
+            description="seller-side friction, segment A",
+            targets=COVERED_TARGETS,
+            raised_at=T0 - timedelta(days=2),
+        ))
+        self.directives.effect("dir-1", now=T0)
         self.failure_store = FailureStore()
         self.log.attach(self.failure_store)
 
@@ -99,6 +113,7 @@ class Rig:
             out_of_frame=OutOfFrameRegister(),
             refusals=RefusalRegister(),
             log=self.log,
+            directives=self.directives,
             assessment=assessment,
             clock=lambda: T0,
         )
@@ -178,8 +193,8 @@ class TestFailuresRecorded:
         )
 
     def test_unregistered_source_recorded(self, rig):
-        refuse(rig, source="ghost")
-        assert rig.log.for_source("ghost")[0].stage is (
+        refuse(rig, source="src-c")  # covered by the directive, unregistered
+        assert rig.log.for_source("src-c")[0].stage is (
             AcquisitionStage.UNREGISTERED_SOURCE
         )
 

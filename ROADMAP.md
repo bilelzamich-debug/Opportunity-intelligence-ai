@@ -85,9 +85,9 @@ N-22 (coverage) · N-23 (research trigger).
 | `T02.2.1` Acquisition | ✅ **CLOSED 2026-08-19** (oip/acquisition.py; 25/25; 15/15) |
 | `T02.2.2` Duplicate detection | ✅ **CLOSED 2026-08-19** (oip/duplicates.py; 25/25; 12/12) |
 | `T02.2.3` Drift detection | ✅ **CLOSED 2026-08-20** (oip/drift.py; 26/26; 13/13) |
-| `T02.2.4` Directive intake | 🟡 **Unblocked 2026-08-19** (D-1 resolved, N-23 §5.5(i)) |
+| `T02.2.4` Directive intake | ✅ **CLOSED 2026-08-20** (oip/directives.py; 30/30; 14/14) |
 | `T02.2.5` Failure recording | ✅ **CLOSED 2026-08-20** (N-10 projection + attempted; 23/23; 12/12) |
-| `T02.3.1` P2 exit gate | 🔴 **BLOCKED** |
+| `T02.3.1` P2 exit gate | 🟢 **Executable** (all F02.1/F02.2 tasks CLOSED) |
 
 **Exit requires the platform to have actually acquired something** — currently
 impossible until the N-24 role is staffed and supplies assessments

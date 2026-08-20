@@ -28,6 +28,10 @@ from oip.acquisition import (  # noqa: E402
 )
 from oip.configuration import FailureStore  # noqa: E402
 from oip.coverage import OutOfFrameRegister  # noqa: E402
+from oip.directives import (  # noqa: E402
+    Directive, DirectiveRegistry, Originator,
+)
+
 from oip.enums import Engine, ObjectType  # noqa: E402
 from oip.rights import (  # noqa: E402
     RIGHTS_AUTHORITY_ROLE, AcquisitionRight, RefusalRegister,
@@ -91,6 +95,14 @@ def _rig():
     failure_store = FailureStore()
     log.attach(failure_store)
 
+    directives = DirectiveRegistry()
+    directives.raise_directive(Directive(
+        directive_id="dir-v", originator=Originator.EXTERNAL_COMMISSION,
+        authority="verifier-owner", description="verifier scope",
+        targets=("src-a", "src-u", "ghost"), raised_at=T0 - timedelta(days=2),
+    ))
+    directives.effect("dir-v", now=T0)
+
     def _request(source="src-a", source_type="VENDOR_PUBLICATION",
                  content=MATERIAL):
         return AcquisitionRequest(
@@ -110,6 +122,7 @@ def _rig():
             request, registry=registry, store=store,
             out_of_frame=OutOfFrameRegister(),
             refusals=RefusalRegister(), log=log,
+            directives=directives,
             assessment=RightsAssessment(
                 source_identifier=source,
                 acquisition=AcquisitionRight.PERMITTED,
@@ -121,7 +134,7 @@ def _rig():
             clock=lambda: T0,
         )
 
-    return registry, store, log, failure_store, _request, _acquire
+    return (registry, store, log, failure_store, _request, _acquire)
 
 
 # ===========================================================================
@@ -237,10 +250,10 @@ check("D", "imports stay within the <=6 exit-gate boundary",
       len(imports) <= 6, str(sorted(imports)))
 check("D", "no retry policy, severity or backend invented (M-36 policy half)",
       not re.search(r"retry|severity|backoff|alert", CODE, re.I))
-check("D", "no new failure stages beyond the ratified sequence",
-      len(list(AcquisitionStage)) == 7)
-check("D", "Production modules unchanged in count (34)",
-      len(list((ROOT / "oip").glob("*.py"))) == 34,
+check("D", "failure stages are exactly the ratified gate sequence",
+      len(list(AcquisitionStage)) == 8)  # +OUT_OF_SCOPE (gate 1, N-20 5.2.1)
+check("D", "Production modules unchanged in count (35)",
+      len(list((ROOT / "oip").glob("*.py"))) == 35,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("D", "Phase 1 modules unchanged",
       __import__("hashlib").md5(
