@@ -121,6 +121,7 @@ class AcquisitionStage(str, Enum):
     SOURCE_TYPE_MISMATCH = "SOURCE_TYPE_MISMATCH"
     UNTYPABLE_CHANNEL = "UNTYPABLE_CHANNEL"
     REFUSED_BY_RIGHTS = "REFUSED_BY_RIGHTS"
+    DUPLICATE_ACQUISITION = "DUPLICATE_ACQUISITION"
     STORE_REJECTED = "STORE_REJECTED"
 
 
@@ -465,6 +466,18 @@ def acquire(
     try:
         stored = store.write_evidence(evidence)
     except WriteRejectedError as exc:
+        if "E-V6" in exc.failure.rule_ids:
+            # T02.2.2 AC1: a duplicate acquisition (same fingerprint plus
+            # source, E-V6) is its own classified outcome, so the duplicate
+            # rate is measurable from recorded facts [N-03, N-10].
+            failure = _failure(
+                request, request.source_identifier,
+                AcquisitionStage.DUPLICATE_ACQUISITION, "E-V6",
+                f"duplicate acquisition: ACTIVE Evidence already holds "
+                f"this fingerprint from this source, so re-acquiring it "
+                f"is not new evidence [E-V6]: {exc}", log, now,
+            )
+            raise _refuse(failure) from exc
         failure = _failure(
             request, request.source_identifier,
             AcquisitionStage.STORE_REJECTED, "ACCEPTANCE_REFUSED",

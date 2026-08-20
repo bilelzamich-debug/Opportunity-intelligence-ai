@@ -239,8 +239,14 @@ check("D", "AC3: an empty fidelity statement is refused at construction",
 check("E", "gate 1 (scope/directives) is deliberately absent (M-01)",
       not re.search(r"directive|OUT_OF_SCOPE", CODE)
       and "M-01" in SRC)
-check("E", "no duplicate or drift logic (T02.2.2/T02.2.3 untouched)",
-      not re.search(r"duplicate|drift", CODE, re.I))
+# Narrowed when T02.2.2 closed: acquisition legitimately CLASSIFIES the
+# store's E-V6 refusal (DUPLICATE_ACQUISITION), but must not implement
+# duplicate DETECTION itself (that is oip/duplicates.py) nor any drift
+# logic (T02.2.3).
+check("E", "no drift logic and no self-made duplicate detection",
+      not re.search(r"drift", CODE, re.I)
+      and "find_duplicate" not in CODE
+      and "compute_fingerprint" not in CODE)
 check("E", "confidence components supplied, never conflated (R-3)",
       "evidential_support" in CODE and "assertion_confidence" in CODE
       and not re.search(r"support\s*=\s*.*assertion", CODE))
@@ -262,8 +268,8 @@ check("F", "records are frozen dataclasses [R-1]",
       SRC.count("@dataclass(frozen=True)") >= 2)
 check("F", "the failure log is lock-guarded [N-11]",
       "threading.RLock" in SRC)
-check("F", "production module count is now 32", 
-      len(list((ROOT / "oip").glob("*.py"))) == 32,
+check("F", "production module count is now 33 (incl. duplicates)",
+      len(list((ROOT / "oip").glob("*.py"))) == 33,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("F", "Phase 1 modules unchanged",
       __import__("hashlib").md5(
