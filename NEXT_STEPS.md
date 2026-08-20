@@ -15,11 +15,14 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T02.1.4` (coverage model, unblocked by
-`T02.1.3`'s closure) and `T02.1.2` (**implementable** — N-24 ratified;
-operational only when the role supplies assessments). Both await
+**What is executable now:** `T02.1.2` (**implementable** — N-24
+ratified; operational only when the role supplies assessments). It awaits
 authorisation per project workflow. ~~`T02.1.1` AC1/AC2~~ — ✅ done
-2026-08-19: `SourceType` populated exactly from N-20 §5.1.
+2026-08-19. ~~`T02.1.4`~~ — ✅ **CLOSED 2026-08-19**: `oip/coverage.py`
+implements N-22 §5 exactly (coverage over types; closed five-reason gap
+vocabulary; out-of-frame register per AS-4; declared-completeness; no
+stopping rule; undefined-never-defaulted; inheritable declarations). Suite
+3,242; verifier 33/33; mutation 14/14.
 
 ---
 
@@ -136,7 +139,7 @@ against the ratified corpus, not merely the backlog's declared edges.
 |---|---|---|---|
 | 1 | `T02.1.3` Independence grouping | ✅ **CLOSED 2026-08-19** | Explicit-input model ratified; existing code + tests are the evidence. Its dependent `T02.1.4` is unblocked |
 | 2 | `T02.1.1` complete AC1/AC2 | ✅ **DONE 2026-08-19** | `SourceType` populated exactly from N-20 §5.1; the verifier matches the enum to the decision table mechanically (38/38; mutation 21/21). **AC3 stays blocked** on M-02/M-43 |
-| 3 | `T02.1.4` Coverage model | 🟢 Unblocked | N-22 in force; needs N-20's taxonomy, which now exists; `T02.1.3` (its dependency) is closed |
+| 3 | `T02.1.4` Coverage model | ✅ **CLOSED 2026-08-19** | `oip/coverage.py`: AC1 coverage measurable · AC2 explicit declarations · AC3 inheritable by PT-V5. Verifier 33/33; mutation 14/14 |
 | 4 | `T02.1.2` Licensing enforcement | 🟢 **Implementable** | N-24 ratified; operational only when the role supplies assessments |
 | 5 | `T02.2.1` Acquisition | 🟡 Sequenced | Depends on `T02.1.2` |
 | 6 | `T02.2.2` Duplicate detection | 🟡 Sequenced | E-V6 already implemented in P1; needs acquired Evidence |

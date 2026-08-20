@@ -81,7 +81,7 @@ N-22 (coverage) · N-23 (research trigger).
 | `T02.1.1` Source model | 🟡 AC1 ✅ (populated from N-20 §5.1, 2026-08-19) AC2 ✅ **AC3 ❌** (M-02/M-43) |
 | `T02.1.2` Licensing enforcement | 🟢 **Implementable** (not operational) — N-24 ratified; awaits role-supplied assessments |
 | `T02.1.3` Independence grouping | ✅ **CLOSED 2026-08-19** (explicit-input model) |
-| `T02.1.4` Coverage model | 🟢 Unblocked |
+| `T02.1.4` Coverage model | ✅ **CLOSED 2026-08-19** (oip/coverage.py; 33/33; 14/14) |
 | `T02.2.1` Acquisition | 🟡 Sequenced |
 | `T02.2.2` Duplicate detection | 🟡 Sequenced |
 | `T02.2.3` Drift detection | 🟡 Sequenced |

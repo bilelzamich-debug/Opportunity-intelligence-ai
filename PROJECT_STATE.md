@@ -55,17 +55,18 @@ supersessions.** No frozen document was rewritten.
 
 | Metric | Value | How verified |
 |---|---|---|
-| Production modules | **29** | `ls oip/*.py \| wc -l` |
-| Production lines | **18,498** | `wc -l oip/*.py` |
-| Test files | **37** | `ls tests/*.py \| wc -l` |
-| Unit tests | **3,204 passing** | `pytest -q` |
+| Production modules | **30** | `ls oip/*.py \| wc -l` |
+| Production lines | **18,974** | `wc -l oip/*.py` |
+| Test files | **38** | `ls tests/*.py \| wc -l` |
+| Unit tests | **3,242 passing** | `pytest -q` |
 | Stress tests | **128 passing** | `pytest -q -m stress` |
-| **Total tests** | **3,332 passing, 0 failing** | both suites |
+| **Total tests** | **3,370 passing, 0 failing** | both suites |
 | Total coverage | **99.0%** | `pytest --cov=oip` |
 | Modules below 95% | **0** | mechanical per-module check |
 | Architecture verifiers | **443 checks passing** | 8 verifier scripts |
 | Mutation score (cascade) | 19/20 killed, 1 proven equivalent | `mutate_t01_2_4_r1.py` |
 | Mutation score (source) | **21/21 killed** | `mutate_t02_1_1.py` |
+| Mutation score (coverage) | **14/14 killed** | `mutate_t02_1_4.py` |
 | Performance regressions | **0** | best-of-3, idle host |
 
 ### 3.2 Largest Modules
@@ -138,7 +139,7 @@ These were adopted as **choices**, not derivations, and are now in force.
 | `T02.1.1` Source model | 🟡 **PARTIAL** — AC1 ✅ **(enum populated from N-20 §5.1, 2026-08-19)** AC2 ✅ **AC3 ❌** | M-02 / M-43 (learnability) |
 | `T02.1.2` Licensing & access policy | 🟢 **IMPLEMENTABLE, not operational** | N-24 ratified 2026-08-19; acquisition requires role-supplied assessments |
 | `T02.1.3` Independence grouping | ✅ **CLOSED 2026-08-19** — explicit-input model; existing code + tests are the evidence | — |
-| `T02.1.4` Coverage model | 🟢 Unblocked | — |
+| `T02.1.4` Coverage model | ✅ **CLOSED 2026-08-19** — AC1 ✅ AC2 ✅ AC3 ✅ (`oip/coverage.py`; verifier 33/33; mutation 14/14) | — |
 | `T02.2.1` Acquisition | 🟡 Sequenced behind `T02.1.2` | — |
 | `T02.2.2` Duplicate detection | 🟡 Sequenced behind `T02.2.1` | — |
 | `T02.2.3` Drift detection | 🟡 Sequenced behind `T02.2.2` | — |
@@ -206,6 +207,7 @@ python -m pytest -q --cov=oip --cov-report=term  # 99.04%
 python validation/closure_t01_8_1.py             # 60/60
 python validation/exit_gate_t01_8_1_rerun.py     # 94/94
 python validation/verify_t02_1_1.py              # 38/38
+python validation/verify_t02_1_4.py              # 33/33
 ```
 
 ## 11. Known Environment Constraints

@@ -210,8 +210,8 @@ check("E", "integrity.py unchanged",
       __import__("hashlib").md5(
           (ROOT / "oip" / "integrity.py").read_bytes()).hexdigest()
       == "42f1a9507b9679a25cfef9321a07fa6a")
-check("E", "exactly one production module was added",
-      len(list((ROOT / "oip").glob("*.py"))) == 29,
+check("E", "exactly two Phase-2 modules exist (source + coverage)",
+      len(list((ROOT / "oip").glob("*.py"))) == 30,
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 
 # ===========================================================================
