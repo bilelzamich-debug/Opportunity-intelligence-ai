@@ -1,8 +1,9 @@
 # Project State
 
 **Authoritative statement of where the Opportunity Intelligence Platform stands.**
-Last updated: **2026-08-19** — D-1 resolved (N-23 §5.5(i)), `T02.1.3` closed,
-N-24 ratified. Prior update: 2026-08-04 (ratification of N-20…N-23).
+Last updated: **2026-08-26** — `T03.1.1` closed (P3 fact extraction opened).
+Prior updates: 2026-08-26 (P2 closed), 2026-08-19 (D-1 resolved, `T02.1.3`
+closed, N-24 ratified), 2026-08-04 (ratification of N-20…N-23).
 
 Every figure in this document was verified by execution or extraction, not
 recalled. Where a number could not be verified, that is stated.
@@ -16,7 +17,7 @@ recalled. Where a number could not be verified, that is stated.
 | **P0** | Specification | ✅ **CLOSED** | 37 decisions ratified; `T00.7.1` exit gate passed |
 | **P1** | Foundation | ✅ **CLOSED** 2026-08-04 | 44/44 tasks, 134/134 acceptance criteria, 60/60 closure checks |
 | **P2** | Research Engine | ✅ **CLOSED 2026-08-26** | All 10 tasks CLOSED (F02.1+F02.2+exit); 8/8 source types acquired; coverage=1.0; 6 decisions ratified |
-| **P3** | Fact Extraction | ⬜ Not started | Blocked at `T03.1.1` by the P2 exit gate |
+| **P3** | Fact Extraction | 🟡 **In progress** — `T03.1.1` CLOSED 2026-08-26; `T03.1.2`/`T03.1.3`/`T03.1.5` unblocked | — |
 | **P4** | Problem Intelligence | ⬜ Not started | — |
 | **P5** | Pattern Intelligence | ⬜ Not started | — |
 | **P6** | Opportunity Intelligence | ⬜ Not started | — |
@@ -55,13 +56,13 @@ supersessions.** No frozen document was rewritten.
 
 | Metric | Value | How verified |
 |---|---|---|
-| Production modules | **35** | `ls oip/*.py \| wc -l` |
-| Production lines | **20,949** | `wc -l oip/*.py` |
-| Test files | **44** | `ls tests/*.py \| wc -l` |
-| Unit tests | **3,410 passing** | `pytest -q` |
+| Production modules | **36** | `ls oip/*.py \| wc -l` |
+| Production lines | **21,861** | `wc -l oip/*.py` |
+| Test files | **45** | `ls tests/*.py \| wc -l` |
+| Unit tests | **3,470 passing** | `pytest -q` |
 | Stress tests | **128 passing** | `pytest -q -m stress` |
-| **Total tests** | **3,538 passing, 0 failing** | both suites |
-| Total coverage | **99.0%** | `pytest --cov=oip` |
+| **Total tests** | **3,598 passing, 0 failing** | both suites |
+| Total coverage | **99.1%** | `pytest --cov=oip` |
 | Modules below 95% | **0** | mechanical per-module check |
 | Architecture verifiers | **443 checks passing** | 8 verifier scripts |
 | Mutation score (cascade) | 19/20 killed, 1 proven equivalent | `mutate_t01_2_4_r1.py` |
@@ -73,6 +74,7 @@ supersessions.** No frozen document was rewritten.
 | Mutation score (drift) | **13/13 killed** | `mutate_t02_2_3.py` |
 | Mutation score (failure recording) | **12/12 killed** | `mutate_t02_2_5.py` |
 | Mutation score (directives) | **14/14 killed** | `mutate_t02_2_4.py` |
+| Mutation score (extraction) | **16/16 killed** | `mutate_t03_1_1.py` |
 | Performance regressions | **0** | best-of-3, idle host |
 
 ### 3.2 Largest Modules
@@ -153,6 +155,12 @@ These were adopted as **choices**, not derivations, and are now in force.
 | `T02.2.5` Failure recording | ✅ **CLOSED 2026-08-20** — AC1 ✅ (every refusal first-class in AcquisitionLog **and** projected into the T01.1.7 FailureStore with N-10's six identifications) AC2 ✅ (`attempted` derived from stage: gate refusals precede the external act per N-21 §5.2). Verifier 23/23; mutation 12/12 | — |
 | `T02.3.1` P2 exit gate | ✅ **CLOSED 2026-08-26** — AC1 ✅ (8/8 types acquired through scope→typability→rights with complete provenance) AC2 ✅ (E-V6 duplicate refused, classified DUPLICATE_ACQUISITION, FailureStore record) AC3 ✅ (coverage=1.0, 0 gaps, declared-complete). Verifier 17/17 | — |
 
+### 6.1 Phase 3 Task Status
+
+| Task | Status | Blocker |
+|---|---|---|
+| `T03.1.1` Claim extraction | ✅ **CLOSED 2026-08-26** — AC1 ✅ (self-contained S-3-structured claims; F-V3 enforced at construction and acceptance) AC2 ✅ (qualifying_context verbatim; ambiguity refused, never guessed; uncertainty preserved) AC3 ✅ (density measured per Evidence, N-20-stratified, never a gate; spread 4.62× ≤ published 6.0× bound on the 8-record P2 corpus). `oip/extraction.py`: one request = one claim; S-5 layer 1 fail-closed (unique verbatim anchor, components present at span — pinned to AnchorVerifier on 200/200 samples); refusals recorded (N-10) with FailureStore projection; equivalence reported per S-3, never merged (T03.1.4). Module coverage 100%; verifier 42/42; probes 25/25; mutation 16/16 | — |
+
 ## 7. Active Blockers
 
 | # | Blocker | Type | Impact |
@@ -207,9 +215,9 @@ its cost.
 
 ```bash
 cd platform
-python -m pytest -q                              # 3,204 pass
+python -m pytest -q                              # 3,470 pass
 python -m pytest -q -m stress                    # 128 pass
-python -m pytest -q --cov=oip --cov-report=term  # 99.04%
+python -m pytest -q --cov=oip --cov-report=term  # 99.1%
 python validation/closure_t01_8_1.py             # 60/60
 python validation/exit_gate_t01_8_1_rerun.py     # 94/94
 python validation/verify_t02_1_1.py              # 38/38
@@ -221,6 +229,7 @@ python validation/verify_t02_2_3.py              # 26/26
 python validation/verify_t02_2_5.py              # 23/23
 python validation/verify_t02_2_4.py              # 30/30
 python validation/verify_t02_3_1.py              # 17/17
+python validation/verify_t03_1_1.py              # 42/42
 ```
 
 ## 11. Known Environment Constraints

@@ -1,8 +1,9 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-08-19** — D-1 resolved, `T02.1.3` closed, N-24 ratified.
-Prior state: 2026-08-04 (ratification of N-20…N-23).
+Current as of **2026-08-26** — `T03.1.1` closed, P3 fact extraction opened.
+Prior state: 2026-08-19 (D-1 resolved, `T02.1.3` closed, N-24 ratified);
+2026-08-04 (ratification of N-20…N-23).
 
 ---
 
@@ -15,8 +16,19 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T03.1.1` (Fact Extraction — P2 closed
-2026-08-26). ~~`T02.3.1`~~ — ✅ **CLOSED 2026-08-26**: 8/8 types
+**What is executable now:** `T03.1.2`, `T03.1.3`, `T03.1.5` (all depend
+only on `T03.1.1`; `T03.1.3` sits on the critical path — `T03.1.4` needs
+both `T03.1.2` and `T03.1.3`, and `T03.2.1` needs `T03.1.3`).
+~~`T03.1.1`~~ — ✅ **CLOSED 2026-08-26**: `oip/extraction.py` turns
+Evidence into self-contained S-3-structured claims with verbatim
+qualifying context, through fail-closed S-5 layer-1 gates (unique
+verbatim anchor; claim components present at the span, pinned to the
+AnchorVerifier on 200/200 samples). One request = one claim; extraction
+never merges (S-3, T03.1.4); REFERENCE-mode, non-ACTIVE, ambiguous and
+unsupported inputs refuse with recorded N-10 failures projected into the
+FailureStore. Suite 3,470 unit + 128 stress; verifier 42/42; probes
+25/25; mutation 16/16; module coverage 100%. Prior text: `T03.1.1` was
+executable because P2 closed 2026-08-26. ~~`T02.3.1`~~ — ✅ **CLOSED 2026-08-26**: 8/8 types
 acquired, E-V6 duplicate, coverage=1.0; verifier 17/17. Prior text: ~~`T02.2.4`~~ (2026-08-20:
 `oip/directives.py` + gate 1 integrated into acquisition per N-20
 §5.2.1's ratified order; verifier 30/30; mutation 14/14). ~~`T02.2.3`~~ — ✅
