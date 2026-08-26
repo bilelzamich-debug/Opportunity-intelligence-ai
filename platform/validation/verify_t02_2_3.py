@@ -255,7 +255,7 @@ check("E", "records are frozen dataclasses [R-1]",
       SRC.count("@dataclass(frozen=True)") >= 2)
 check("E", "the register is lock-guarded [N-11]", "threading.RLock" in SRC)
 check("E", "production module count is now 36 (incl. extraction, T03.1.1)",
-      len(list((ROOT / "oip").glob("*.py"))) == 36,  # 35 through T02.3.1; +1 extraction (T03.1.1)
+      len(list((ROOT / "oip").glob("*.py"))) == 37,  # 35 through T02.3.1; +1 extraction (T03.1.1); +1 anchoring (T03.1.3)
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("E", "Phase 1 modules unchanged",
       __import__("hashlib").md5(

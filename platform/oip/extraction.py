@@ -55,6 +55,37 @@ Architecture References:
 - M-11   Closed by R-5: identity and deduplication live in the Fact
          registry and the S-3 equivalence test, not here.
 
+POSITIONAL ANCHORING (T03.1.3)
+-------------------------------
+The T03.1.1 anchor is the verbatim span; it resolves by exact substring,
+which locates the claim only by scanning the content -- the IOM's
+"anchor loss" failure mode. T03.1.3 adds the positional layer beside it,
+without changing the attachment model or any T03.1.1 behavior:
+
+- locator format (closed):  chars <start>-<end>   e.g.  chars 41-78
+  0-based, half-open (content[start:end] == span), units are code points
+  (CJK, RTL and astral-plane characters each count as one).
+- locate(): computes the locator once, at anchoring time, from the unique
+  span. That single search IS the anchoring computation. Everything that
+  locates the claim LATER -- verification, audit, F-V6/T03.2.1 -- resolves
+  through resolve_locator(), a direct slice: O(1), no scan, no re-reading.
+  That asymmetry is the acceptance criterion.
+- resolve_locator() parses strictly (full-match ASCII digits, bounds,
+  non-empty) and fails closed on anything else; it never searches and
+  never guesses.
+- PositionalAnchorRegister: a side register (the N-10/N-22 pattern --
+  registers live outside the object model and never enter the lineage
+  graph) mapping (evidence_ref, span) -> locator. Looking up an
+  attachment's position requires neither content nor scanning.
+- extract() computes, round-trip-verifies and records the locator for
+  EVERY accepted extraction. A round-trip failure is unreachable by
+  construction -- which is exactly why it fails closed with a recorded
+  ANCHOR_NOT_RESOLVABLE refusal. No anchor is ever invented.
+- evidence_span_provider() / fact_anchor_claims() feed the EXISTING
+  AnchorVerifier machinery (T01.4.6, S-5 layer 1) from real Evidence
+  content. Installing them store-wide at acceptance is T03.2.1; here they
+  are delivered and demonstrated.
+
 WHAT IS IMPLEMENTED (the three T03.1.1 acceptance criteria)
 ------------------------------------------------------------
 - AC1  Claims interpretable without reading the Evidence: one request per
@@ -90,6 +121,7 @@ AnchorVerifier's ratified semantics). T03.1.3 generalises locators.
 
 from __future__ import annotations
 
+import re
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -139,7 +171,7 @@ class ExtractionStage(str, Enum):
 
     Order mirrors evaluation: request validity, Evidence resolution and
     usability, temporal consistency, content, anchor resolution, Layer-1
-    component presence, persistence."""
+    component presence, positional round-trip, persistence."""
 
     INVALID_REQUEST = "INVALID_REQUEST"
     EVIDENCE_NOT_FOUND = "EVIDENCE_NOT_FOUND"
@@ -148,6 +180,7 @@ class ExtractionStage(str, Enum):
     EMPTY_CONTENT = "EMPTY_CONTENT"
     ANCHOR_NOT_FOUND = "ANCHOR_NOT_FOUND"
     AMBIGUOUS_ANCHOR = "AMBIGUOUS_ANCHOR"
+    ANCHOR_NOT_RESOLVABLE = "ANCHOR_NOT_RESOLVABLE"
     UNSUPPORTED_CLAIM = "UNSUPPORTED_CLAIM"
     STORE_REJECTED = "STORE_REJECTED"
 
@@ -162,6 +195,7 @@ _ATTEMPTED_STAGES = frozenset(
         ExtractionStage.EMPTY_CONTENT,
         ExtractionStage.ANCHOR_NOT_FOUND,
         ExtractionStage.AMBIGUOUS_ANCHOR,
+        ExtractionStage.ANCHOR_NOT_RESOLVABLE,
         ExtractionStage.UNSUPPORTED_CLAIM,
         ExtractionStage.STORE_REJECTED,
     }
@@ -308,6 +342,128 @@ class ExtractionLog:
                 counts[f.stage] = counts.get(f.stage, 0) + 1
             return counts
 
+
+# ---------------------------------------------------------------------------
+# Positional anchoring  [T03.1.3]
+# ---------------------------------------------------------------------------
+
+
+class AnchoringError(ExtractionError):
+    """A positional anchor could not be computed, parsed or resolved.
+
+    Fail-closed: an anchor that cannot be located exactly is refused,
+    never guessed."""
+
+
+# The closed locator grammar. ASCII digits ONLY: Python's int() accepts
+# non-ASCII decimal digits (int("٤٥") == 45), which would let a look-alike
+# locator pass; [0-9] refuses them. Half-open, code-point indexed.
+LOCATOR_PATTERN = re.compile(r"chars ([0-9]+)-([0-9]+)\Z")
+
+
+def locate(content: str, span: str) -> str:
+    """Compute the positional locator of the unique occurrence of span.
+
+    The single search here is the anchoring computation, performed once on
+    content already in hand. Every later location goes through
+    resolve_locator() -- a direct slice, no scanning. [T03.1.3 AC2]
+    """
+    occurrences = _locate(content, span)
+    if occurrences == 0:
+        raise AnchoringError(
+            "span does not occur verbatim in the content; no positional "
+            "anchor can be computed [F-V2]"
+        )
+    if occurrences > 1:
+        # Preserve uncertainty instead of resolving it: an ambiguous span
+        # gets no locator, never a guessed position. [AC2]
+        raise AnchoringError(
+            f"span occurs {occurrences} times; a positional anchor requires "
+            f"exactly one occurrence [T03.1.3]"
+        )
+    start = content.find(span)
+    return f"chars {start}-{start + len(span)}"
+
+
+def resolve_locator(content: str, locator: str) -> str:
+    """Resolve a positional locator to its span by DIRECT SLICE.
+
+    No searching: the locator is the address, not a query. Malformed,
+    out-of-bounds or empty locators refuse -- an anchor that cannot be
+    resolved exactly is a failure, never a guess. [F-V2, F-I3]
+    """
+    match = LOCATOR_PATTERN.fullmatch(locator.strip()) if locator else None
+    if match is None:
+        raise AnchoringError(
+            f"locator {locator!r} is not of the closed form "
+            f"'chars <start>-<end>' (ASCII digits, half-open)"
+        )
+    start, end = int(match.group(1)), int(match.group(2))
+    if start >= end:
+        raise AnchoringError(
+            f"locator {locator!r} is empty or inverted; a span is non-empty"
+        )
+    if end > len(content):
+        raise AnchoringError(
+            f"locator {locator!r} exceeds the content length {len(content)}"
+        )
+    return content[start:end]
+
+
+@dataclass
+class PositionalAnchorRegister:
+    """Side register of positional anchors. [T03.1.3, N-10/N-22 pattern]
+
+    Maps (evidence_ref, span) -> locator for every accepted extraction.
+    Lives outside the object model and never enters the lineage graph, in
+    the established register pattern. Looking up an attachment's position
+    is a dict access -- no content, no scan.
+    """
+
+    _anchors: dict[tuple[str, str], str] = field(default_factory=dict)
+    _lock: threading.RLock = field(default_factory=threading.RLock)
+
+    def record(self, evidence_ref: str, span: str, locator: str) -> str:
+        """Record one anchor. A conflicting re-registration raises: the
+        locator is determined by the content alone, so a mismatch means a
+        programming error or content drift, never a new fact."""
+        with self._lock:
+            key = (evidence_ref, span)
+            existing = self._anchors.get(key)
+            if existing is not None:
+                if existing != locator:
+                    raise AnchoringError(
+                        f"conflicting positional anchor for "
+                        f"{evidence_ref!r}: {existing!r} vs {locator!r}"
+                    )
+                return existing
+            self._anchors[key] = locator
+            return locator
+
+    def locator_for(self, evidence_ref: str, span: str) -> str | None:
+        with self._lock:
+            return self._anchors.get((evidence_ref, span))
+
+    def for_evidence(self, evidence_ref: str) -> dict[str, str]:
+        with self._lock:
+            return {
+                span: locator
+                for (ref, span), locator in self._anchors.items()
+                if ref == evidence_ref
+            }
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._anchors)
+
+
+# The S-5 bridge -- evidence_span_provider() and fact_anchor_claims(),
+# which feed the ratified AnchorVerifier (T01.4.6) from real Evidence
+# content -- lives in oip/anchoring.py: it needs oip.semantic's Anchor and
+# AnchorClaim types, and this module's oip-import budget is already at the
+# exit gate's maximum of six. The split is deliberate: this module holds
+# the string-level anchoring machinery and the extraction flow; anchoring
+# holds the bridge to the S-5 types.
 
 # ---------------------------------------------------------------------------
 # The request  [AC1, AC2 -- everything required, nothing defaulted]
@@ -509,6 +665,10 @@ class ExtractionOutcome:
     evidence_ref: str
     claim: Claim
     span: str
+    locator: str | None = None
+    """The positional anchor of the span (T03.1.3): 'chars <start>-<end>',
+    round-trip verified against the Evidence content at extraction
+    time."""
     equivalence: tuple[tuple[Fact, EquivalenceResult], ...] = ()
 
     @property
@@ -522,17 +682,21 @@ def extract(
     store: KnowledgeStore,
     log: ExtractionLog,
     clock: Callable[[], datetime] = utc_now,
+    anchors: PositionalAnchorRegister | None = None,
 ) -> ExtractionOutcome:
     """Extract one self-contained claim from one Evidence object. [AC1]
 
     Fail-closed throughout: a Fact exists only after every gate passed --
     request validity, Evidence resolution and ACTIVE status, in-place
     verifiability (N-15), temporal consistency (V8), non-empty content,
-    unique verbatim anchor, S-5 layer-1 component presence, and the
-    store's own acceptance path (F-V1..F-V6 with the universal rules).
-    Any refusal is recorded in the log -- and projected into an attached
-    FailureStore -- before the exception is raised, so no refusal is ever
-    silent and no partial trace remains.
+    unique verbatim anchor, S-5 layer-1 component presence, the
+    positional anchor round-trip (T03.1.3), and the store's own
+    acceptance path (F-V1..F-V6 with the universal rules). Every accepted
+    extraction carries a resolvable positional anchor; with `anchors`,
+    it is also registered for O(1) later location. Any refusal is
+    recorded in the log -- and projected into an attached FailureStore --
+    before the exception is raised, so no refusal is ever silent and no
+    partial trace remains.
     """
     now = clock()
 
@@ -664,6 +828,40 @@ def extract(
         )
         raise _refuse(failure)
 
+    # -- Anchor gate 3: the POSITIONAL anchor must resolve back to the
+    # exact span by direct slice. [T03.1.3 AC1/AC2: every accepted
+    # attachment carries a resolvable anchor, precise enough to locate
+    # the claim without re-reading] Unconditional: computed, then
+    # round-trip verified. The round trip is unreachable false -- which
+    # is exactly why a failure here must fail closed rather than be
+    # papered over: a Fact with an unresolvable anchor would break F-V2
+    # at verification time, silently if invented here. [N-10]
+    try:
+        locator = locate(body, request.anchor)
+        located = resolve_locator(body, locator)
+    except AnchoringError as exc:  # pragma: no cover - defensive by
+        # construction: gates 1-2 already guaranteed a unique in-bounds
+        # span, so the computation cannot raise; the refusal exists so
+        # that if that guarantee ever breaks, it fails closed. [N-10]
+        failure = _failure(
+            request, request.evidence_ref,
+            ExtractionStage.ANCHOR_NOT_RESOLVABLE,
+            "POSITIONAL_ROUND_TRIP_FAILED",
+            f"the positional anchor for the verified span failed its "
+            f"round trip: {exc} [T03.1.3, F-V2]", log, now,
+        )
+        raise _refuse(failure) from exc
+    if located != request.anchor:  # pragma: no cover - construction, not luck
+        failure = _failure(
+            request, request.evidence_ref,
+            ExtractionStage.ANCHOR_NOT_RESOLVABLE,
+            "POSITIONAL_ROUND_TRIP_FAILED",
+            "the positional locator resolved to a different span than "
+            "the one verified; refusing rather than anchoring to the "
+            "wrong position [T03.1.3, F-V2]", log, now,
+        )
+        raise _refuse(failure)
+
     # -- Compose the Fact. [AC1, AC2, R-3, IOM S 3.2]
     claim = request.as_claim()
     support = evidence.attributes.confidence.effective_confidence
@@ -754,6 +952,13 @@ def extract(
         )
         raise _refuse(failure)
 
+    # -- Register the positional anchor of the accepted attachment.
+    # [T03.1.3 AC2: later location goes through the register -- O(1),
+    # no content in hand, no scan] Only accepted extractions are
+    # registered. [N-10]
+    if anchors is not None:
+        anchors.record(request.evidence_ref, request.anchor, locator)
+
     # -- S-3 equivalence REPORT against every other ACTIVE Fact. The
     # just-written Fact assesses EQUIVALENT against itself; that is not
     # information, so it is excluded. Nothing is merged here. [S-3, T03.1.4]
@@ -769,6 +974,7 @@ def extract(
         claim=claim,
         span=request.anchor,
         equivalence=equivalence,
+        locator=locator,
     )
 
 
