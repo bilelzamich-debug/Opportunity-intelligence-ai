@@ -222,8 +222,8 @@ check("F", "module header names its task",
       re.search(r"Task: T02\.1\.2", SRC) is not None)
 check("F", "module does not claim to close a marker",
       not re.search(r"\bCloses\s*[:|]\s*M-\d+", SRC))
-check("F", "production module count is now 35 (incl. directives)",
-      len(list((ROOT / "oip").glob("*.py"))) == 35,
+check("F", "production module count is now 36 (incl. extraction, T03.1.1)",
+      len(list((ROOT / "oip").glob("*.py"))) == 36,  # 35 through T02.3.1; +1 extraction (T03.1.1)
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("F", "Phase 1 modules unchanged",
       __import__("hashlib").md5(

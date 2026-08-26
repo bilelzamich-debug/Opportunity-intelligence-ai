@@ -244,8 +244,8 @@ check("E", "no drift logic (T02.2.3 is untouched)",
       not re.search(r"drift", _dupe_src, re.I))
 check("E", "module header names its task",
       re.search(r"Task: T02\.2\.2", SRC_DUP) is not None)
-check("E", "production module count is now 35 (incl. directives)",
-      len(list((ROOT / "oip").glob("*.py"))) == 35,
+check("E", "production module count is now 36 (incl. extraction, T03.1.1)",
+      len(list((ROOT / "oip").glob("*.py"))) == 36,  # 35 through T02.3.1; +1 extraction (T03.1.1)
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("E", "Phase 1 modules unchanged",
       __import__("hashlib").md5(
