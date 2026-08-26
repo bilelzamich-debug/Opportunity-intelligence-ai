@@ -1,8 +1,9 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-08-26** — `T03.1.1` closed, P3 fact extraction opened.
-Prior state: 2026-08-19 (D-1 resolved, `T02.1.3` closed, N-24 ratified);
+Current as of **2026-08-27** — `T03.1.3` closed (positional anchoring, F-V2).
+Prior state: 2026-08-26 (`T03.1.1` closed, P3 fact extraction opened);
+2026-08-19 (D-1 resolved, `T02.1.3` closed, N-24 ratified);
 2026-08-04 (ratification of N-20…N-23).
 
 ---
@@ -16,9 +17,20 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T03.1.2`, `T03.1.3`, `T03.1.5` (all depend
-only on `T03.1.1`; `T03.1.3` sits on the critical path — `T03.1.4` needs
-both `T03.1.2` and `T03.1.3`, and `T03.2.1` needs `T03.1.3`).
+**What is executable now:** `T03.1.2`, `T03.1.5` (both depend only on
+`T03.1.1`; `T03.1.4` needs `T03.1.2` — `T03.1.3` is done).
+~~`T03.1.3`~~ — ✅ **CLOSED 2026-08-27**: positional anchoring into source
+Evidence (F-V2). Every accepted attachment carries a resolvable anchor in
+two forms: the verbatim span (T03.1.1, preserved) and a positional locator
+`chars <start>-<end>` (0-based, half-open, code-point indexed) — computed,
+round-trip-verified and registered at extraction; located later by direct
+slice with no search and no full re-reading. Fail-closed throughout:
+ambiguous and absent spans get no locator, malformed/Unicode-digit/
+out-of-bounds locators refuse, ANCHOR_NOT_RESOLVABLE records (N-10).
+S-5 bridge `oip/anchoring.py`: F-V6 PASSES via the ratified AnchorVerifier
+on 100% of the multilingual corpus; M-67 open; acceptance-path wiring is
+T03.2.1's. Suite 3,541 unit + 128 stress; verifier 46/46; probes 26/26;
+mutation 16/16; extraction.py and anchoring.py coverage 100%.
 ~~`T03.1.1`~~ — ✅ **CLOSED 2026-08-26**: `oip/extraction.py` turns
 Evidence into self-contained S-3-structured claims with verbatim
 qualifying context, through fail-closed S-5 layer-1 gates (unique

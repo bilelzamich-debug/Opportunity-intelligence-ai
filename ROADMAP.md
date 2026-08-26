@@ -12,7 +12,7 @@ begins. Phase boundaries come from PKP v1 §9; blocking markers from PKP v2 §14
 | **P0** | Specification | 37 decisions | ✅ **CLOSED** | — |
 | **P1** | Foundation | 44 | ✅ **CLOSED** 2026-08-04 | — |
 | **P2** | Research Engine | 10 | ✅ **CLOSED 2026-08-26** | — |
-| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1` closed 2026-08-26) | M-19, M-20 |
+| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1` closed 2026-08-26; `T03.1.3` closed 2026-08-27) | M-19, M-20 |
 | **P4** | Problem Intelligence | ~12 | ⬜ | M-12, M-21, M-22, M-06 |
 | **P5** | Pattern Intelligence | ~14 | ⬜ | M-23, M-24, M-25, M-13 |
 | **P6** | Opportunity Intelligence | ~18 | ⬜ | C-01, M-14, M-26, M-27 |
@@ -101,9 +101,16 @@ impossible until the N-24 role is staffed and supplies assessments
 platform's integrity floor.
 
 **`T03.1.1` ✅ CLOSED 2026-08-26** — `oip/extraction.py`; verifier 42/42;
-mutation 16/16. Next: `T03.1.2` (decomposition), `T03.1.3` (anchoring,
-critical path), `T03.1.5` (claim-type classification). M-11 was already
-closed by R-5.
+mutation 16/16. M-11 was already closed by R-5.
+
+**`T03.1.3` ✅ CLOSED 2026-08-27** — positional anchoring (F-V2):
+`oip/extraction.py` + `oip/anchoring.py`; verifier 46/46; probes 26/26;
+mutation 16/16. Every accepted attachment dual-resolvable (verbatim +
+`chars <start>-<end>` locator, direct-slice location, no re-reading);
+F-V6 PASSES through the ratified AnchorVerifier on 100% of the corpus;
+M-67 stays open; acceptance-path wiring is T03.2.1's. Next: `T03.1.2`
+(decomposition), `T03.1.5` (claim-type classification); `T03.1.4`
+(merging) still awaits `T03.1.2`.
 
 | Marker | Gap |
 |---|---|
