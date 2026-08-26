@@ -77,6 +77,7 @@ chk "verify_t02_2_2 duplicates (25)"      "25/25"   python validation/verify_t02
 chk "verify_t02_2_3 drift (26)"           "26/26"   python validation/verify_t02_2_3.py
 chk "verify_t02_2_5 failure recording (23)" "23/23"  python validation/verify_t02_2_5.py
 chk "verify_t02_2_4 directives (30)"       "30/30"   python validation/verify_t02_2_4.py
+chk "verify_t02_3_1 P2 exit gate (17)"     "17/17"   python validation/verify_t02_3_1.py
 # verify_t02_1_1_blocker.py asserted M-16 was OPEN. N-20 has since closed it
 # partially, so the verifier is historically true but currently false by
 # design. Archived to validation/superseded/ rather than deleted.

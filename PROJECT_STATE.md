@@ -15,7 +15,7 @@ recalled. Where a number could not be verified, that is stated.
 |---|---|---|---|
 | **P0** | Specification | ✅ **CLOSED** | 37 decisions ratified; `T00.7.1` exit gate passed |
 | **P1** | Foundation | ✅ **CLOSED** 2026-08-04 | 44/44 tasks, 134/134 acceptance criteria, 60/60 closure checks |
-| **P2** | Research Engine | 🟡 **IN PROGRESS** | 5 decisions ratified (N-24 latest, 2026-08-19); `T02.1.3` closed; `T02.2.4` unblocked (D-1 resolved); acquisition awaits role-supplied assessments |
+| **P2** | Research Engine | ✅ **CLOSED 2026-08-26** | All 10 tasks CLOSED (F02.1+F02.2+exit); 8/8 source types acquired; coverage=1.0; 6 decisions ratified |
 | **P3** | Fact Extraction | ⬜ Not started | Blocked at `T03.1.1` by the P2 exit gate |
 | **P4** | Problem Intelligence | ⬜ Not started | — |
 | **P5** | Pattern Intelligence | ⬜ Not started | — |
@@ -151,7 +151,7 @@ These were adopted as **choices**, not derivations, and are now in force.
 | `T02.2.3` Drift detection | ✅ **CLOSED 2026-08-20** — AC1 ✅ (`detect`: N-15 mismatch against a named original) AC2 ✅ (`DriftRegister`, N-10 pattern) AC3 ✅ (supersession via store.transition **only on explicit fidelity declaration**; E-V6 ACTIVE-only enables re-acquisition). Verifier 26/26; mutation 13/13 | — |
 | `T02.2.4` Directive intake | ✅ **CLOSED 2026-08-20** — AC1 ✅ (gate 1: only IN_EFFECT directives scope; RAISED/CANCELLED/EXPIRED/FULFILLED scope nothing) AC2 ✅ (targets recorded with their commissioning authority verbatim) AC3 ✅ (out-of-scope refuses at gate 1 with recorded failure, G16; order per N-20 §5.2.1). Verifier 30/30; mutation 14/14 | — |
 | `T02.2.5` Failure recording | ✅ **CLOSED 2026-08-20** — AC1 ✅ (every refusal first-class in AcquisitionLog **and** projected into the T01.1.7 FailureStore with N-10's six identifications) AC2 ✅ (`attempted` derived from stage: gate refusals precede the external act per N-21 §5.2). Verifier 23/23; mutation 12/12 | — |
-| `T02.3.1` P2 exit gate | 🔴 **BLOCKED** | Requires operational acquisition |
+| `T02.3.1` P2 exit gate | ✅ **CLOSED 2026-08-26** — AC1 ✅ (8/8 types acquired through scope→typability→rights with complete provenance) AC2 ✅ (E-V6 duplicate refused, classified DUPLICATE_ACQUISITION, FailureStore record) AC3 ✅ (coverage=1.0, 0 gaps, declared-complete). Verifier 17/17 | — |
 
 ## 7. Active Blockers
 
@@ -220,6 +220,7 @@ python validation/verify_t02_2_2.py              # 25/25
 python validation/verify_t02_2_3.py              # 26/26
 python validation/verify_t02_2_5.py              # 23/23
 python validation/verify_t02_2_4.py              # 30/30
+python validation/verify_t02_3_1.py              # 17/17
 ```
 
 ## 11. Known Environment Constraints

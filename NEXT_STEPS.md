@@ -15,8 +15,9 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T02.3.1` (the P2 exit gate) — every
-Feature F02.1/F02.2 task is CLOSED, including `T02.2.4` (2026-08-20:
+**What is executable now:** `T03.1.1` (Fact Extraction — P2 closed
+2026-08-26). ~~`T02.3.1`~~ — ✅ **CLOSED 2026-08-26**: 8/8 types
+acquired, E-V6 duplicate, coverage=1.0; verifier 17/17. Prior text: ~~`T02.2.4`~~ (2026-08-20:
 `oip/directives.py` + gate 1 integrated into acquisition per N-20
 §5.2.1's ratified order; verifier 30/30; mutation 14/14). ~~`T02.2.3`~~ — ✅
 **CLOSED 2026-08-20**: `oip/drift.py` implements N-15's mismatch test

@@ -11,8 +11,8 @@ begins. Phase boundaries come from PKP v1 §9; blocking markers from PKP v2 §14
 |---|---|---|---|---|
 | **P0** | Specification | 37 decisions | ✅ **CLOSED** | — |
 | **P1** | Foundation | 44 | ✅ **CLOSED** 2026-08-04 | — |
-| **P2** | Research Engine | 10 | 🟡 **IN PROGRESS** | role-supplied assessments (N-24 ratified 2026-08-19; D-1 resolved) |
-| **P3** | Fact Extraction | ~15 | ⬜ | M-19, M-11, M-20 |
+| **P2** | Research Engine | 10 | ✅ **CLOSED 2026-08-26** | — |
+| **P3** | Fact Extraction | ~15 | 🟢 **Unblocked** (P2 closed 2026-08-26) | M-19, M-11, M-20 |
 | **P4** | Problem Intelligence | ~12 | ⬜ | M-12, M-21, M-22, M-06 |
 | **P5** | Pattern Intelligence | ~14 | ⬜ | M-23, M-24, M-25, M-13 |
 | **P6** | Opportunity Intelligence | ~18 | ⬜ | C-01, M-14, M-26, M-27 |
@@ -67,7 +67,7 @@ times** — the first two halted on defects that all prior validation missed.
 
 ---
 
-## P2 — Research Engine 🟡 IN PROGRESS (acquisition gated on role-supplied assessments)
+## P2 — Research Engine ✅ CLOSED 2026-08-26
 
 **Goal.** Acquire external source material as Evidence with complete
 provenance. The platform's only external-world acquisition boundary.
@@ -87,7 +87,7 @@ N-22 (coverage) · N-23 (research trigger).
 | `T02.2.3` Drift detection | ✅ **CLOSED 2026-08-20** (oip/drift.py; 26/26; 13/13) |
 | `T02.2.4` Directive intake | ✅ **CLOSED 2026-08-20** (oip/directives.py; 30/30; 14/14) |
 | `T02.2.5` Failure recording | ✅ **CLOSED 2026-08-20** (N-10 projection + attempted; 23/23; 12/12) |
-| `T02.3.1` P2 exit gate | 🟢 **Executable** (all F02.1/F02.2 tasks CLOSED) |
+| `T02.3.1` P2 exit gate | ✅ **CLOSED 2026-08-26** (8/8 types; E-V6; coverage 1.0; 17/17) |
 
 **Exit requires the platform to have actually acquired something** — currently
 impossible until the N-24 role is staffed and supplies assessments
