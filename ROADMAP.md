@@ -12,7 +12,7 @@ begins. Phase boundaries come from PKP v1 §9; blocking markers from PKP v2 §14
 | **P0** | Specification | 37 decisions | ✅ **CLOSED** | — |
 | **P1** | Foundation | 44 | ✅ **CLOSED** 2026-08-04 | — |
 | **P2** | Research Engine | 10 | ✅ **CLOSED 2026-08-26** | — |
-| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1` closed 2026-08-26; `T03.1.3` closed 2026-08-27) | M-19, M-20 |
+| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1`/`T03.1.2` closed; `T03.1.3` closed 2026-08-27) | M-19, M-20 |
 | **P4** | Problem Intelligence | ~12 | ⬜ | M-12, M-21, M-22, M-06 |
 | **P5** | Pattern Intelligence | ~14 | ⬜ | M-23, M-24, M-25, M-13 |
 | **P6** | Opportunity Intelligence | ~18 | ⬜ | C-01, M-14, M-26, M-27 |
@@ -108,9 +108,16 @@ mutation 16/16. M-11 was already closed by R-5.
 mutation 16/16. Every accepted attachment dual-resolvable (verbatim +
 `chars <start>-<end>` locator, direct-slice location, no re-reading);
 F-V6 PASSES through the ratified AnchorVerifier on 100% of the corpus;
-M-67 stays open; acceptance-path wiring is T03.2.1's. Next: `T03.1.2`
-(decomposition), `T03.1.5` (claim-type classification); `T03.1.4`
-(merging) still awaits `T03.1.2`.
+M-67 stays open; acceptance-path wiring is T03.2.1's.
+
+**`T03.1.2` ✅ CLOSED 2026-08-27** — claim decomposition (S-3):
+`oip/extraction.py` (`decompose()`); verifier 39/39; probes 21/21;
+mutation 11/11. Every claim decomposed byte-identically to the
+four-component structure; non-comparable quantities rejected with
+recorded DECOMPOSITION_FAILED refusals; every verdict recomputable from
+the four structure checks; merge policy reported, never executed
+(T03.1.4's boundary). M-19 stays open. Next: `T03.1.5` (claim-type
+classification); `T03.1.4` (merging) unblocked.
 
 | Marker | Gap |
 |---|---|

@@ -1,8 +1,10 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-08-27** — `T03.1.3` closed (positional anchoring, F-V2).
-Prior state: 2026-08-26 (`T03.1.1` closed, P3 fact extraction opened);
+Current as of **2026-08-27** — `T03.1.2` closed (claim decomposition, S-3);
+`T03.1.4` is now unblocked (its two dependencies `.2`+`.3` are done).
+Prior state: 2026-08-27 (`T03.1.3` closed), 2026-08-26 (`T03.1.1` closed,
+P3 fact extraction opened);
 2026-08-19 (D-1 resolved, `T02.1.3` closed, N-24 ratified);
 2026-08-04 (ratification of N-20…N-23).
 
@@ -17,9 +19,19 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T03.1.2`, `T03.1.5` (both depend only on
-`T03.1.1`; `T03.1.4` needs `T03.1.2` — `T03.1.3` is done).
-~~`T03.1.3`~~ — ✅ **CLOSED 2026-08-27**: positional anchoring into source
+**What is executable now:** `T03.1.4` (needs `.2`+`.3`, both done),
+`T03.1.5` (depends only on `.1`).
+~~`T03.1.2`~~ — ✅ **CLOSED 2026-08-27**: structured claim decomposition
+per S-3. `decompose()` in `oip/extraction.py` projects the four S-3
+components byte-identically and fail-closes on what the structure would
+carry but comparison cannot (non-real/non-finite Quantity → recorded
+DECOMPOSITION_FAILED refusal, no Fact, no anchor); the self-equivalence
+witness makes AC2 mechanical: every pairwise verdict is recomputable from
+the four structure checks, the merge-policy table equals the S-3 decision,
+and EQUIVALENT verdicts are REPORTED only — merging stays T03.1.4's.
+Synonyms not resolved; compound inputs stay one verbatim claim (M-19
+open). Verifier 39/39; probes 21/21; mutation 11/11; extraction.py
+coverage 100%. ~~`T03.1.3`~~ — ✅ **CLOSED 2026-08-27**: positional anchoring into source
 Evidence (F-V2). Every accepted attachment carries a resolvable anchor in
 two forms: the verbatim span (T03.1.1, preserved) and a positional locator
 `chars <start>-<end>` (0-based, half-open, code-point indexed) — computed,
