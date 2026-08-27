@@ -114,6 +114,35 @@ created; no positional anchor is registered for a refused extraction.
 Merging is never executed here -- verdicts and actions are reported
 only (T03.1.4 executes D-05).
 
+CANONICAL-CLAIM MERGING (T03.1.4)
+----------------------------------
+D-05: a Fact is a canonical claim, not an extraction event. extract()
+now consults the store BEFORE persisting (pre-write interception, so
+"adds an attachment, not a new Fact" is mechanically guaranteed):
+
+- EQUIVALENT (S-3, the only merging verdict): the extraction attaches
+  to the canonical Fact via with_attachment under an explicit F-I4
+  MergeJustification, and the canonical is superseded by a NEW VERSION
+  (allocator.succeed; V11; I5 forces transition-then-write, and the
+  canonical is restored to ACTIVE if the successor write fails, so the
+  claim never loses its ACTIVE representative). The merged version's
+  confidence is RE-DERIVED per R-3/V5: support = min over the effective
+  confidence of EVERY Evidence in the widened upstream set, assertion =
+  min(predecessor assertion, this extraction's certainty) -- never
+  inherited blindly.
+- CONTAINMENT / UNCERTAIN: no merge (S-3 conservative policy). A
+  separate Fact is created and the DUPLICATES link is recorded on it
+  (V12-conformant); both Facts stay ACTIVE.
+- NOT_EQUIVALENT: a separate Fact, no link.
+- A replay (the canonical already attaches THIS Evidence) refuses with
+  a recorded MERGE_FAILED / EVIDENCE_ALREADY_ATTACHED failure.
+All merge refusals are recorded N-10-faithfully (attempted stage). The
+density report counts ACTIVE Facts only, so corroboration is never
+double-counted across superseded versions. Independence is never
+inferred: merged attachments start UNASSESSED and the count does not
+move [N-16]. The interim T03.1.1 "never merges" boundary is superseded
+by this task, with the affected pins re-semantified under provenance.
+
 WHAT IS IMPLEMENTED (the three T03.1.1 acceptance criteria)
 ------------------------------------------------------------
 - AC1  Claims interpretable without reading the Evidence: one request per
@@ -152,7 +181,7 @@ from __future__ import annotations
 import math
 import re
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from enum import Enum
 from typing import Callable, Iterator
@@ -177,7 +206,13 @@ from oip.contract import (
     utc_now,
 )
 from oip.evidence import StorageMode
-from oip.fact import ClaimType, EvidenceAttachment, Fact, Independence
+from oip.fact import (
+    ClaimType,
+    EvidenceAttachment,
+    Fact,
+    Independence,
+    MergeJustification,
+)
 from oip.store import KnowledgeStore, WriteRejectedError
 
 # ---------------------------------------------------------------------------
@@ -215,7 +250,7 @@ class ExtractionStage(str, Enum):
     Order mirrors evaluation: request validity, Evidence resolution and
     usability, temporal consistency, content, anchor resolution, Layer-1
     component presence, positional round-trip, claim decomposition,
-    persistence."""
+    canonical merge, persistence."""
 
     INVALID_REQUEST = "INVALID_REQUEST"
     EVIDENCE_NOT_FOUND = "EVIDENCE_NOT_FOUND"
@@ -226,6 +261,7 @@ class ExtractionStage(str, Enum):
     AMBIGUOUS_ANCHOR = "AMBIGUOUS_ANCHOR"
     ANCHOR_NOT_RESOLVABLE = "ANCHOR_NOT_RESOLVABLE"
     DECOMPOSITION_FAILED = "DECOMPOSITION_FAILED"
+    MERGE_FAILED = "MERGE_FAILED"
     UNSUPPORTED_CLAIM = "UNSUPPORTED_CLAIM"
     STORE_REJECTED = "STORE_REJECTED"
 
@@ -242,6 +278,7 @@ _ATTEMPTED_STAGES = frozenset(
         ExtractionStage.AMBIGUOUS_ANCHOR,
         ExtractionStage.ANCHOR_NOT_RESOLVABLE,
         ExtractionStage.DECOMPOSITION_FAILED,
+        ExtractionStage.MERGE_FAILED,
         ExtractionStage.UNSUPPORTED_CLAIM,
         ExtractionStage.STORE_REJECTED,
     }
@@ -765,9 +802,12 @@ class ExtractionOutcome:
     """One accepted extraction. Traceable end to end.
 
     `equivalence` reports the S-3 assessment of this claim against every
-    other ACTIVE Fact in the store (never against itself). It is a
-    REPORT, not an action: merging and DUPLICATES recording are
-    T03.1.4's deliverables, and extraction never merges.
+    other ACTIVE Fact in the store (never against itself). The merge
+    decision was made before persistence [T03.1.4]: `merged_into` names
+    the surviving canonical Fact version when the claim merged
+    (EQUIVALENT), otherwise None; `duplicates` lists the Facts linked
+    DUPLICATES when equivalence was recognised but NOT merged
+    (CONTAINMENT/UNCERTAIN -- the S-3 conservative policy).
     """
 
     fact: Fact
@@ -779,6 +819,14 @@ class ExtractionOutcome:
     round-trip verified against the Evidence content at extraction
     time."""
     equivalence: tuple[tuple[Fact, EquivalenceResult], ...] = ()
+    merged_into: str | None = None
+    """object_id of the surviving canonical Fact version after a merge
+    (T03.1.4 AC1/AC2); None when this extraction created its own
+    Fact."""
+    duplicates: tuple[str, ...] = ()
+    """object_ids of Facts linked DUPLICATES from this extraction's Fact
+    (T03.1.4 AC3): equivalence recognised, never merged."""
+
 
     @property
     def object_id(self) -> str:
@@ -987,9 +1035,219 @@ def extract(
         )
         raise _refuse(failure) from exc
 
+    attachment = EvidenceAttachment(
+        evidence_ref=request.evidence_ref,
+        positional_anchor=request.anchor,
+        extracted_at=now,
+        extraction_confidence=float(request.extraction_confidence),
+        independence_assessment=Independence.UNASSESSED,
+    )
+
+    # -- D-05 merge decision BEFORE any write. [T03.1.4 AC1] The only
+    # verdict that merges is EQUIVALENT (S-3 MERGE_POLICY); intercepting
+    # here is what makes "adds an attachment, not a new Fact"
+    # mechanically guaranteed -- no duplicate Fact is ever persisted and
+    # then reconciled.
+    existing = store.facts.find_equivalent(claim)
+    if existing is not None:
+        canonical, assessment = existing
+        if canonical.attachment_for(request.evidence_ref) is not None:
+            # A replay of already-attached Evidence: F-I2 refuses a
+            # second attachment of the same Evidence, so the extraction
+            # is recorded and refused rather than re-attached. [N-10]
+            failure = _failure(
+                request, request.evidence_ref,
+                ExtractionStage.MERGE_FAILED, "EVIDENCE_ALREADY_ATTACHED",
+                f"the canonical Fact {canonical.object_id!r} already "
+                f"attaches Evidence {request.evidence_ref!r}; a replay "
+                f"adds nothing and is refused, never re-attached "
+                f"[F-I2, T03.1.4]", log, now,
+            )
+            raise _refuse(failure)
+
+        justification = MergeJustification(
+            verdict=Verdict.EQUIVALENT,
+            reason=assessment.reason,
+            merged_evidence_ref=request.evidence_ref,
+            merged_at=now,
+        )
+
+        def _compose_merged() -> "Fact":
+            # Composed EXACTLY ONCE per extraction: succeed() records the
+            # predecessor as superseded in the allocator [R-1], so a
+            # second composition would refuse. The composed version is
+            # reused by the transition and the write below.
+            merged = canonical.with_attachment(
+                attachment, justification,
+                identity=store.allocator.succeed(canonical.attributes.identity),
+            )
+            # R-3/V5: the merged version's ceiling is RE-DERIVED over the
+            # complete widened upstream set -- min of every attesting
+            # Evidence's effective confidence -- and never inherited
+            # from the predecessor.
+            upstream_refs = [a.evidence_ref for a in merged.attachments]
+            support = min(
+                store.get_evidence(ref).attributes.confidence.effective_confidence
+                for ref in upstream_refs
+            )
+            assertion = min(
+                canonical.attributes.confidence.assertion_confidence,
+                float(request.extraction_confidence),
+            )
+            attributes = replace(
+                merged.attributes,
+                produced_at=now,
+                confidence=Confidence.create(
+                    support, assertion, upstream_ceiling=support
+                ),
+                explanation=Explanation(
+                    objects_referenced=tuple(upstream_refs),
+                    criteria_applied=(
+                        "S-3 claim structure: subject/predicate/qualifier/value",
+                        "D-05: equivalent extraction attached to the canonical Fact",
+                        "F-I4: merge justified by the S-3 four-condition verdict",
+                        "R-3/V5: support re-derived as min over the widened "
+                        "upstream Evidence set",
+                    ),
+                    reasoning=(
+                        f"Equivalent extraction of the canonical claim: "
+                        f"attached to Fact {canonical.object_id!r} "
+                        f"(version {canonical.attributes.version}) as an "
+                        f"additional attachment from Evidence "
+                        f"{request.evidence_ref!r}; S-3 justification: "
+                        f"{assessment.reason}; the canonical was "
+                        f"superseded by this new version under R-1/V11; "
+                        f"evidential support re-derived as min over the "
+                        f"widened upstream set = {support:.2f}; assertion "
+                        f"confidence = min(predecessor, this extraction) "
+                        f"= {assertion:.2f} [T03.1.4]"
+                    ),
+                ),
+            )
+            return replace(merged, attributes=attributes)
+
+        # -- ORDERING, stated deliberately: I5 permits only ONE ACTIVE
+        # version per lineage, so the canonical must be superseded
+        # BEFORE the successor is written, and SUPERSEDED is TERMINAL
+        # under R-2 -- a post-supersession write failure cannot be
+        # undone. The failure surface is structurally closed instead:
+        # V5 cannot fail (the ceiling was re-derived as the min over the
+        # widened upstream set above), V11 is allocator-consistent
+        # (succeed()), V12 carries no DUPLICATES on the merge path, and
+        # Evidence references cannot introduce a lineage cycle; the
+        # fact-payload rules are pre-satisfied (F-V1 trivially, F-V2 by
+        # the extraction gates, F-V3 by decompose(), F-V4 by request
+        # validation, F-V5 by with_attachment's count invariant, F-V6
+        # unwired by default [T03.2.1]). Should a write still fail, the
+        # refusal names the surviving state: the canonical is SUPERSEDED
+        # with every attachment intact and no successor -- data intact,
+        # fully auditable, nothing silent. [N-10]
+        try:
+            # Composed inside the guarded region: succeed() (the
+            # allocator handoff) is the first step that can refuse a
+            # merge under concurrency [R-1].
+            merged = _compose_merged()
+            store.transition(
+                canonical.object_id, ObjectStatus.SUPERSEDED,
+                "corroborated: equivalent extraction attached [D-05, F-I4]",
+            )
+        except Exception as exc:
+            # Narrow, documented guard for store-side merge refusals that
+            # are not acceptance failures: concurrent merges surface as
+            # the allocator's branching refusal, registry gaps as lookup
+            # failures. Every one is recorded and loud. [N-10]
+            failure = _failure(
+                request, request.evidence_ref,
+                ExtractionStage.MERGE_FAILED, "MERGE_NOT_POSSIBLE",
+                f"the merge into canonical Fact "
+                f"{canonical.object_id!r} could not proceed; no partial "
+                f"state survives (the canonical is unchanged or "
+                f"restored): {type(exc).__name__}: {exc} [T03.1.4, N-10]",
+                log, now,
+            )
+            raise _refuse(failure) from exc
+        try:
+            stored_fact = store.write_fact(
+                merged, predecessor_id=canonical.object_id
+            )
+        except WriteRejectedError as exc:  # pragma: no cover - structural
+            # closure argued above: every acceptance rule that could
+            # reject the merged version is pre-satisfied by
+            # construction. SUPERSEDED is TERMINAL [R-2], so the
+            # canonical cannot be restored; the refusal names the exact
+            # surviving state -- data intact, fully auditable, nothing
+            # silent. [N-10]
+            failure = _failure(
+                request, request.evidence_ref,
+                ExtractionStage.MERGE_FAILED, "ACCEPTANCE_REFUSED",
+                f"the store's acceptance path refused the merged Fact "
+                f"version despite its passing the pre-write dry-run; the "
+                f"canonical Fact {canonical.object_id!r} is SUPERSEDED "
+                f"(terminal under R-2) and holds every attachment it "
+                f"had; no successor exists; the store retains the "
+                f"acceptance failure record and this refusal is "
+                f"recorded [N-08/N-06/T03.1.4]: {exc}",
+                log, now,
+            )
+            raise _refuse(failure) from exc
+
+        accepted = store.get_fact(stored_fact.object_id)
+        if accepted is None:  # structural invariant: just committed
+            failure = _failure(
+                request, request.evidence_ref,
+                ExtractionStage.MERGE_FAILED, "REGISTRY_GAP",
+                "the store accepted the merged Fact version but its "
+                "registry lost the payload; reporting refusal rather "
+                "than a phantom success [N-10]",
+                log, now,
+            )
+            raise _refuse(failure)
+
+        # -- Register the accepted attachment's positional anchor.
+        # [T03.1.3 invariant: only accepted extractions register]
+        if anchors is not None:
+            anchors.record(request.evidence_ref, request.anchor, locator)
+
+        # -- S-3 equivalence REPORT (predecessor auto-excluded: it is
+        # SUPERSEDED and no longer ACTIVE).
+        equivalence = tuple(
+            (other, result)
+            for other, result in store.facts.assess_all(claim)
+            if other.object_id != accepted.object_id
+        )
+        return ExtractionOutcome(
+            fact=accepted,
+            evidence_ref=request.evidence_ref,
+            claim=claim,
+            span=request.anchor,
+            equivalence=equivalence,
+            locator=locator,
+            merged_into=stored_fact.object_id,
+            duplicates=(),
+        )
+
+    # -- Separate path: no EQUIVALENT canonical exists. [S-3] Every
+    # ACTIVE Fact whose verdict requires it (CONTAINMENT or UNCERTAIN)
+    # receives a DUPLICATES link from this new Fact; the peers are left
+    # untouched -- the relationship is symmetric in the relationship
+    # model, and retroactive re-versioning would be churn without
+    # correctness gain. NOT_EQUIVALENT links nothing. [T03.1.4 AC3]
+    duplicates_targets = tuple(
+        peer.object_id
+        for peer, result in store.facts.assess_all(claim)
+        if result.verdict in (Verdict.CONTAINMENT, Verdict.UNCERTAIN)
+    )
+
     # -- Compose the Fact. [AC1, AC2, R-3, IOM S 3.2]
     support = evidence.attributes.confidence.effective_confidence
     identity = store.allocator.new_object()
+    merge_reasoning = ""
+    if duplicates_targets:
+        merge_reasoning = (
+            f" Equivalence was recognised but NOT merged (S-3 "
+            f"conservative policy); DUPLICATES links recorded to "
+            f"{list(duplicates_targets)} [T03.1.4]."
+        )
     attributes = UniversalAttributes(
         identity=identity,
         object_type=ObjectType.FACT,
@@ -997,6 +1255,7 @@ def extract(
         produced_at=now,
         engine_configuration_ref=request.engine_configuration_ref,
         derives_from=(LineageRef(request.evidence_ref, ObjectType.EVIDENCE),),
+        duplicates=duplicates_targets,
         explanation=Explanation(
             objects_referenced=(request.evidence_ref,),
             criteria_applied=(
@@ -1013,7 +1272,7 @@ def extract(
                 f"{float(request.extraction_confidence):.2f} as supplied "
                 f"by the extractor; evidential support {support:.2f} "
                 f"taken from the source Evidence's own effective "
-                f"confidence"
+                f"confidence{merge_reasoning}"
             ),
         ),
         evidence_reachable=True,
@@ -1028,13 +1287,6 @@ def extract(
         # inferred (T02.1.3 explicit-input model), so the attachment
         # starts UNASSESSED and corroboration stays unclaimed. [F-V5]
         independent_source_count=1,
-    )
-    attachment = EvidenceAttachment(
-        evidence_ref=request.evidence_ref,
-        positional_anchor=request.anchor,
-        extracted_at=now,
-        extraction_confidence=float(request.extraction_confidence),
-        independence_assessment=Independence.UNASSESSED,
     )
     fact = Fact(
         attributes=attributes,
@@ -1085,7 +1337,8 @@ def extract(
 
     # -- S-3 equivalence REPORT against every other ACTIVE Fact. The
     # just-written Fact assesses EQUIVALENT against itself; that is not
-    # information, so it is excluded. Nothing is merged here. [S-3, T03.1.4]
+    # information, so it is excluded. Verdicts are a report; the merge
+    # decision was made above. [S-3]
     equivalence = tuple(
         (other, result)
         for other, result in store.facts.assess_all(claim)
@@ -1099,6 +1352,8 @@ def extract(
         span=request.anchor,
         equivalence=equivalence,
         locator=locator,
+        merged_into=None,
+        duplicates=duplicates_targets,
     )
 
 
@@ -1188,8 +1443,17 @@ def build_density_report(
         )
 
     # Claims per Evidence, counted from persisted Fact attachments.
+    # T03.1.4: only ACTIVE Facts are counted -- after a merge the
+    # superseded predecessor still holds its attachments, and counting
+    # every version would double-count corroboration. For corpora with
+    # no merges the numbers are unchanged.
     claims_by_evidence: dict[str, int] = {}
     for stored in store.objects_of_type(ObjectType.FACT):
+        stored_object = store.find(stored.object_id)
+        if stored_object is not None and (
+            stored_object.status is not ObjectStatus.ACTIVE
+        ):
+            continue
         fact = store.get_fact(stored.object_id)
         if fact is None:
             continue  # pragma: no cover - registry invariant

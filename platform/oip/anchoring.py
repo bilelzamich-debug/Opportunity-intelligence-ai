@@ -17,6 +17,16 @@ machinery (Anchor, AnchorClaim, AnchorVerifier, SpanProvider, Fact,
 locator format). The module graph stays a DAG: anchoring ->
 {extraction, fact, semantic}; nothing imports anchoring.
 
+Architecture References:
+- S-5    layer 1: the RATIFIED AnchorVerifier over real Evidence
+         content; the anchor must locate uniquely in the Evidence.
+- D-04   locator discipline: closed-form computed positional locators,
+         half-open, code points; never sub-string search at verify time.
+- AC2    (T03.1.3) anchors are computed, round-trip verified, and
+         registered only for ACCEPTED extractions.
+
+Tasks: T03.1.3 (positional anchoring bridge).
+
 Limitations (unchanged by design): AnchorVerifier layer 1 checks that the
 anchor resolves to a real span and that subject and predicate are present
 at that span; it cannot detect paraphrase drift -- a subject present

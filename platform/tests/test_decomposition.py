@@ -462,8 +462,13 @@ class TestEquivalenceSupport:
         assert MERGE_POLICY[Verdict.NOT_EQUIVALENT] is MergeAction.SEPARATE
 
     def test_extraction_reports_equivalence_but_never_merges(self):
-        # T03.1.4 boundary: identical claims from two Evidence stay two
-        # Facts; the EQUIVALENT verdict is a report only
+        # PROVENANCE (T03.1.4, supersedes the interim T03.1.2 boundary):
+        # identical claims from two Evidence used to stay two Facts with
+        # the EQUIVALENT verdict reported only. D-05 merging is now
+        # implemented, so the verdict is RECORDED as the F-I4 merge
+        # justification on the surviving canonical version -- the
+        # reasoning surface (Principle 2) is preserved, and the merge is
+        # asserted explicitly.
         rig = vendor_rig("src-e1", "src-e2")
         content = "Vendor changelog: bulk edits silently fail above 50 SKUs."
         ref1 = rig.acquire("src-e1", VENDOR, content)
@@ -476,16 +481,25 @@ class TestEquivalenceSupport:
             make_request(evidence_ref=ref2),
             store=rig.store, log=rig.log, clock=lambda: TICK,
         )
-        fact_count = sum(
-            1 for _ in rig.store.objects_of_type(
-                __import__("oip.enums", fromlist=["ObjectType"]).ObjectType.FACT
-            )
+        from oip.enums import ObjectStatus
+
+        assert second.merged_into == second.object_id
+        canonical = rig.store.get_fact(second.object_id)
+        assert canonical.attachment_count == 2
+        assert len(canonical.merge_history) == 1
+        assert canonical.merge_history[0].verdict is Verdict.EQUIVALENT
+        assert canonical.merge_history[0].reason.strip()
+        assert rig.store.find(first.object_id).status is ObjectStatus.SUPERSEDED
+        # the same claim from two Evidence is ONE canonical lineage
+        predecessor = rig.store.get_fact(first.object_id)
+        assert predecessor.attributes.identity.lineage_id == (
+            canonical.attributes.identity.lineage_id
         )
-        assert fact_count == 2  # no merge executed
-        assert any(
-            result.verdict is Verdict.EQUIVALENT
-            for _, result in second.equivalence
-        )
+        # PROVENANCE (T03.1.4): the old final assertion here checked the
+        # EQUIVALENT verdict in second.equivalence. After a merge there
+        # IS no other ACTIVE Fact to report against; the verdict now
+        # lives on the canonical as the F-I4 justification, asserted
+        # above.
 
     def test_synonyms_are_not_resolved(self):
         # S-3: subject identity "still requires judgement" -- the

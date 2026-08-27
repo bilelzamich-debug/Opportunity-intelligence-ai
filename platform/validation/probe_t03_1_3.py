@@ -24,7 +24,7 @@ Attacks:
   P14  RTL override marks (U+202E) count as code points: round trip exact
   P15  astral-plane offsets are code points, not UTF-16 units
   P16  boundary: locator ending exactly at len(content) resolves; +1 refuses
-  P17  re-extraction of the same span: same locator, two Facts, no merge
+  P17  same-Evidence re-extraction: refused as a replay [T03.1.4]
   P18  register completeness: every accepted attachment is registered
   P19  refusal recording: fabricated anchor refusal is attempted-flagged;
        ANCHOR_NOT_RESOLVABLE is an attempted stage [N-10]
@@ -419,13 +419,31 @@ tick = lambda: T0 + timedelta(minutes=1)  # noqa: E731
 first = extract(rig_idem.extraction(evidence_ref=ref_idem),
                 store=rig_idem.store, log=rig_idem.log, clock=tick,
                 anchors=register_idem)
-second = extract(rig_idem.extraction(evidence_ref=ref_idem),
-                 store=rig_idem.store, log=rig_idem.log, clock=tick,
-                 anchors=register_idem)
+# PROVENANCE (T03.1.4): P17 pinned "re-extraction of the same span
+# yields two Facts, no merge". Under D-05 the same-span re-extraction
+# of the SAME Evidence is a REPLAY: F-I2 (add-only attachments) refuses
+# it as MERGE_FAILED / EVIDENCE_ALREADY_ATTACHED -- never re-attached,
+# no phantom version. The idempotence invariant survives as: one Fact,
+# one attachment, one anchor registration after the refused replay.
+replay_refusal = None
+try:
+    extract(rig_idem.extraction(evidence_ref=ref_idem),
+            store=rig_idem.store, log=rig_idem.log, clock=tick,
+            anchors=register_idem)
+except ExtractionRefusedError as exc:
+    replay_refusal = exc
 facts_now = list(rig_idem.store.objects_of_type(
     __import__("oip.enums", fromlist=["ObjectType"]).ObjectType.FACT))
-probe("P17 re-extraction: same locator, two Facts, no merge",
-      first.locator == second.locator == LOCATOR and len(facts_now) == 2
+replay_failure = (
+    rig_idem.log.for_evidence(ref_idem)[-1] if replay_refusal else None)
+probe("P17 same-Evidence re-extraction refused as a replay "
+      "[F-I2/T03.1.4]",
+      first.locator == LOCATOR and replay_refusal is not None
+      and replay_failure is not None
+      and replay_failure.stage is ExtractionStage.MERGE_FAILED
+      and replay_failure.reason == "EVIDENCE_ALREADY_ATTACHED"
+      and len(facts_now) == 1
+      and rig_idem.store.get_fact(facts_now[0].object_id).attachment_count == 1
       and len(register_idem) == 1)
 
 rig_c = Rig(("src-en", "src-zh", "src-ar"))

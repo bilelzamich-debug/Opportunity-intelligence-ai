@@ -511,7 +511,14 @@ check("D", "every refusal carries stage, reason and detail",
       ))
 
 # ===========================================================================
-# E. S-3 equivalence surfaces; extraction never merges
+# E. S-3 equivalence REALIZED as the canonical merge
+# PROVENANCE (T03.1.4): this section pinned the T03.1.1 interim boundary
+# "equivalence reported, never merged". T03.1.4 (D-05) supersedes that
+# boundary: EQUIVALENT extractions now attach to the existing canonical
+# Fact as a new version. The S-3 judgement itself is unchanged -- it now
+# surfaces as the merge justification (merge_history) instead of a
+# report on a second Fact. Checks below were re-semantified accordingly;
+# no assertion was silently deleted or weakened.
 # ===========================================================================
 
 # identical claim from a second Evidence: two Facts, EQUIVALENT reported
@@ -610,20 +617,33 @@ o_second = extract(
     store=store, log=extraction_log,
     clock=lambda: TICK + timedelta(hours=3),
 )
-check("E", "identical claims stay distinct Facts (under-merge) [S-3]",
+check("E", "identical claims MERGE into one canonical [D-05/T03.1.4]",
       o_first.object_id != o_second.object_id
+      and o_second.merged_into is not None
       and store.get_fact(o_first.object_id) is not None
       and store.get_fact(o_second.object_id) is not None)
 
+# The equivalence report auto-excludes the predecessor (it is SUPERSEDED
+# and no longer in active_facts); the EQUIVALENT judgement now lives on
+# the merge justification of the new version [T03.1.4].
 equivalent_verdicts = [
     result.verdict for _, result in o_second.equivalence
     if result.verdict is Verdict.EQUIVALENT
 ]
-check("E", "S-3 equivalence REPORTED between the duplicates",
-      len(equivalent_verdicts) >= 1)
+merged_version = store.get_fact(o_second.object_id)
+check("E", "S-3 equivalence REALIZED: EQUIVALENT recorded as the merge "
+      "justification [T03.1.4]",
+      len(merged_version.merge_history) >= 1
+      and merged_version.merge_history[-1].verdict is Verdict.EQUIVALENT
+      and merged_version.merge_history[-1].merged_evidence_ref
+      == second.object_id
+      and equivalent_verdicts == [])
 
-check("E", "neither duplicate was merged (one attachment each)",
-      store.get_fact(o_second.object_id).attachment_count == 1)
+check("E", "the merged version carries both attachments; the "
+      "predecessor keeps its own [F-I2/T03.1.4]",
+      merged_version.attachment_count == 2
+      and store.get_fact(o_first.object_id).attachment_count == 1
+      and store.find(o_first.object_id).status is ObjectStatus.SUPERSEDED)
 
 # value disagreement: NOT_EQUIVALENT, both retained
 registry.register("src-lista", "MARKETPLACE_LISTING")
@@ -748,36 +768,50 @@ check("F", "local layer-1 gate == AnchorVerifier on 200 random samples",
 # G. Traceability audit -- every Fact resolvable to its Evidence
 # ===========================================================================
 
+# PROVENANCE (T03.1.4): the per-Fact trace was "exactly one derives_from
+# reference == the outcome's Evidence". A merged Fact legitimately
+# derives from EVERY attesting Evidence (with_attachment appends to
+# derives_from), so the audit now requires derives_from to cover exactly
+# the attachment set, every reference resolvable, and the ceiling to
+# hold against EVERY attachment -- strictly stronger than the single-
+# evidence form on merged Facts.
 all_outcomes = outcomes + [o_second, o_46, o_49]
 trace_ok = True
 trace_detail = ""
 for o in all_outcomes:
     fact = store.get_fact(o.object_id)
     stored = store.find(o.object_id)
-    derives = stored.attributes.derives_from
-    if len(derives) != 1 or derives[0].object_id != o.evidence_ref:
+    derive_refs = {r.object_id for r in stored.attributes.derives_from}
+    att_refs = {a.evidence_ref for a in fact.attachments}
+    if derive_refs != att_refs or o.evidence_ref not in derive_refs:
         trace_ok, trace_detail = False, f"{o.object_id} lineage"
         break
-    evidence_obj = store.get_evidence(o.evidence_ref)
-    if evidence_obj is None:
-        trace_ok, trace_detail = False, f"{o.object_id} evidence missing"
-        break
-    attachment = fact.attachment_for(o.evidence_ref)
-    content = evidence_obj.content.content
-    if content.count(attachment.positional_anchor) != 1:
-        trace_ok, trace_detail = False, f"{o.object_id} anchor"
-        break
-    src_conf = evidence_obj.attributes.confidence.effective_confidence
-    conf = fact.attributes.confidence
-    if conf.effective_confidence > min(
-        src_conf, attachment.extraction_confidence
-    ) + 1e-9:
-        trace_ok, trace_detail = False, f"{o.object_id} ceiling"
+    for attachment in fact.attachments:
+        evidence_obj = store.get_evidence(attachment.evidence_ref)
+        if evidence_obj is None:
+            trace_ok = False
+            trace_detail = f"{o.object_id} evidence missing"
+            break
+        content = evidence_obj.content.content
+        if content.count(attachment.positional_anchor) != 1:
+            trace_ok = False
+            trace_detail = f"{o.object_id} anchor"
+            break
+        src_conf = evidence_obj.attributes.confidence.effective_confidence
+        conf = fact.attributes.confidence
+        if conf.effective_confidence > min(
+            src_conf, attachment.extraction_confidence
+        ) + 1e-9:
+            trace_ok = False
+            trace_detail = f"{o.object_id} ceiling"
+            break
+    if not trace_ok:
         break
     if fact.independent_source_count > fact.attachment_count:
         trace_ok, trace_detail = False, f"{o.object_id} F-V5"
         break
-check("G", "every Fact traces to exactly one resolvable ACTIVE Evidence",
+check("G", "every Fact traces to resolvable ACTIVE Evidence "
+      "(derives_from == attachment set)",
       trace_ok, trace_detail)
 
 check("G", "anchor of every attachment locates uniquely in its Evidence",

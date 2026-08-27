@@ -355,26 +355,36 @@ check("B", "AC2: the merge-policy table IS the S-3 decision",
           Verdict.NOT_EQUIVALENT: MergeAction.SEPARATE,
       })
 
-# no merge executed at extraction: re-extract the EN row verbatim
-dup = None
+# PROVENANCE (T03.1.4): this block pinned the T03.1.1/T03.1.2 interim
+# boundary "EQUIVALENT verdicts are REPORTED; extraction never merges"
+# by re-extracting the EN row VERBATIM (same Evidence) and asserting
+# two distinct Facts (count == 7). T03.1.4 (D-05) supersedes the
+# boundary: EQUIVALENT across DIFFERENT Evidence now merges into the
+# canonical. A verbatim same-Evidence re-extraction is a REPLAY under
+# F-I2 (add-only attachments) and is REFUSED as MERGE_FAILED /
+# EVIDENCE_ALREADY_ATTACHED -- no version is created, so the fact count
+# is conserved at 7. EQUIVALENT-across-different-Evidence merging is
+# proven mechanically by verify_t03_1_4 and the unit suite.
+before_replay_facts = sum(1 for _ in store.objects_of_type(ObjectType.FACT))
+replay_refused = False
 try:
-    dup = extract(
+    extract(
         requests["en-vendor"], store=store, log=extraction_log,
         clock=lambda: TICK, anchors=register,
     )
 except ExtractionRefusedError:
-    pass
-check("B", "AC2: EQUIVALENT verdicts are REPORTED; extraction never merges "
-      "[T03.1.4 boundary]",
-      dup is not None
-      and any(
-          result.verdict is Verdict.EQUIVALENT
-          for _, result in dup.equivalence
-      )
-      and sum(1 for _ in store.objects_of_type(ObjectType.FACT)) == 7)
+    replay_refused = True
+replay_failure = extraction_log.for_evidence(evidence_ids["en-vendor"])[-1]
+check("B", "AC2: same-Evidence replay refused, nothing re-attached, fact "
+      "count conserved [F-I2/T03.1.4]",
+      replay_refused
+      and replay_failure.stage is ExtractionStage.MERGE_FAILED
+      and replay_failure.reason == "EVIDENCE_ALREADY_ATTACHED"
+      and sum(1 for _ in store.objects_of_type(ObjectType.FACT))
+      == before_replay_facts)
 
 check("B", "AC2: decomposition equivalence survives extraction round-trip",
-      decompose(requests["en-vendor"]) == dup.claim)
+      decompose(requests["en-vendor"]) == accepted["en-vendor"].claim)
 
 # ===========================================================================
 # C. Integration order: layer 1 first; decomposition before persistence

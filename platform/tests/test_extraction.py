@@ -628,6 +628,15 @@ class TestMultiplicity:
             assert fact.attachments[0].evidence_ref == ref
 
     def test_multiple_evidence_distinct_claims_no_collapse(self):
+        # PROVENANCE (T03.1.4, supersedes the interim T03.1.1 boundary):
+        # this test originally asserted that identical claims from two
+        # Evidence stay two Facts because extraction never merged. D-05
+        # merging is now implemented, so the assertion is STRENGTHENED,
+        # not weakened: the second extraction must attach to the
+        # canonical Fact under an explicit F-I4 justification and
+        # produce a NEW VERSION -- no accidental collapse (the
+        # superseded predecessor keeps its own attachment, F-I2), no
+        # parallel Fact.
         rig = vendor_rig("src-a", "src-b")
         ra = rig.acquire("src-a", VENDOR,
                          "Changelog: bulk edits silently fail above 50 SKUs.")
@@ -642,11 +651,26 @@ class TestMultiplicity:
             store=rig.store, log=rig.log,
             clock=lambda: TICK + timedelta(seconds=1),
         )
-        assert o1.object_id != o2.object_id
-        # equivalence REPORTED, never acted upon
-        assert o2.equivalence[0][1].verdict is Verdict.EQUIVALENT
-        assert rig.store.get_fact(o1.object_id).attachment_count == 1
-        assert rig.store.get_fact(o2.object_id).attachment_count == 1
+        from oip.enums import ObjectStatus
+
+        # merged, not a parallel Fact: o2 IS the new canonical version
+        assert o2.merged_into == o2.object_id
+        assert o1.object_id != o2.object_id  # new version, new object_id
+        predecessor = rig.store.get_fact(o1.object_id)
+        successor = rig.store.get_fact(o2.object_id)
+        # AC2: merge produces a new Fact version
+        assert successor.attributes.version == (
+            predecessor.attributes.version + 1
+        )
+        assert rig.store.find(o1.object_id).status is ObjectStatus.SUPERSEDED
+        # F-I2: the predecessor's attachment is intact, never removed
+        assert predecessor.attachment_count == 1
+        # AC1: the equivalent claim ADDED an attachment
+        assert successor.attachment_count == 2
+        # F-I4: the merge carries the explicit S-3 justification
+        assert len(successor.merge_history) == 1
+        assert successor.merge_history[0].verdict is Verdict.EQUIVALENT
+        assert successor.merge_history[0].merged_evidence_ref == rb
 
     def test_equivalence_self_report_excluded(self):
         rig, ref = changelog_rig()

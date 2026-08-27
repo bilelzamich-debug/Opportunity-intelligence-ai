@@ -88,33 +88,26 @@ MUTATIONS = [
      SRC,
      "    support = evidence.attributes.confidence.effective_confidence",
      "    support = 1.0"),
-    # -- S-3: extraction never merges ---------------------------------------
-    ("M10 equivalent claim merged into an existing Fact (over-merge)",
+    # -- S-3/D-05: only EQUIVALENT merges ------------------------------------
+    # PROVENANCE (T03.1.4): the original M10 injected a primitive inline
+    # merge to prove T03.1.1's extractor never merged. Under T03.1.4
+    # merging IS the behavior for EQUIVALENT, so that mutant now describes
+    # legitimate behavior and survives. Re-anchored to the discipline
+    # T03.1.4 actually guarantees: UNCERTAIN/CONTAINMENT verdicts must
+    # NEVER merge (AC3, MERGE_POLICY SEPARATE_WITH_DUPLICATES). The
+    # mutant widens find_equivalent (EQUIVALENT-only) to any non-NOT_
+    # EQUIVALENT pair -- an over-merge the suite must kill.
+    ("M10 over-merge: UNCERTAIN/CONTAINMENT merged like EQUIVALENT [AC3]",
      SRC,
-     '''    # -- Persistence through the acceptance path (F-V1..F-V6 + universal
-    # rules; V5 re-checks the confidence ceiling against the source).
-    try:
-        stored_fact = store.write_fact(fact)''',
-     '''    # -- Persistence through the acceptance path (F-V1..F-V6 + universal
-    # rules; V5 re-checks the confidence ceiling against the source).
-    try:
-        existing = store.facts.find_equivalent(claim)
-        if existing is not None and existing[0].object_id != fact.object_id:
-            canonical = existing[0]
-            fact = canonical.with_attachment(
-                attachment,
-                __import__(
-                    "oip.fact", fromlist=["MergeJustification"]
-                ).MergeJustification(
-                    verdict=__import__(
-                        "oip.claim", fromlist=["Verdict"]
-                    ).Verdict.EQUIVALENT,
-                    reason="mutant: merged without T03.1.4 machinery",
-                    merged_evidence_ref=attachment.evidence_ref,
-                    merged_at=now,
-                ),
-            )
-        stored_fact = store.write_fact(fact)'''),
+     '''    existing = store.facts.find_equivalent(claim)''',
+     '''    _overmerge_pairs = store.facts.assess_all(claim)
+    existing = next(
+        ((_f, _a) for _f, _a in _overmerge_pairs
+         if _a.verdict is not __import__(
+             "oip.claim", fromlist=["Verdict"]
+         ).Verdict.NOT_EQUIVALENT),
+        None,
+    )'''),
     # -- N-10: refusal recording ---------------------------------------------
     ("M11 unsupported-claim refusal becomes silent (never recorded)",
      SRC,
@@ -165,9 +158,14 @@ MUTATIONS = [
 
 def _run() -> int:
     _purge_pycache()
+    # PROVENANCE (T03.1.4): the kill suite gains tests/test_merging.py --
+    # the re-anchored M10 (over-merge of UNCERTAIN/CONTAINMENT verdicts)
+    # is pinned there (TestDuplicatesNotMerges); test_extraction.py alone
+    # cannot kill it. Adding tests only STRENGTHENS the kill standard for
+    # every mutant; no mutant's original kill is weakened.
     proc = subprocess.run(
         [sys.executable, "-m", "pytest", "-x", "-q",
-         "tests/test_extraction.py"],
+         "tests/test_extraction.py", "tests/test_merging.py"],
         cwd=ROOT, capture_output=True, text=True, timeout=600,
         env={**__import__("os").environ, "PYTHONDONTWRITEBYTECODE": "1"},
     )

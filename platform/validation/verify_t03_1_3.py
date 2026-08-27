@@ -450,11 +450,23 @@ fact_count = sum(
 check("E", "T03.1.1: extractor never merges (S-3 report only)",
       fact_count >= len(accepted), f"facts={fact_count}")
 
-# equivalence still surfaces: re-extract the EN row against itself
-dup_outcome = None
+# PROVENANCE (T03.1.4): this probe re-extracted the EN row against the
+# SAME Evidence and pinned "EQUIVALENT reported, nothing merged". Under
+# D-05 a same-Evidence re-extraction is a REPLAY: F-I2 refuses it as
+# MERGE_FAILED / EVIDENCE_ALREADY_ATTACHED before anything attaches --
+# the correct add-only discipline. The invariant retained here: the
+# refused replay creates NO Fact version, attaches nothing, and is
+# recorded; EQUIVALENT-across-DIFFERENT-Evidence merging is proven
+# mechanically by verify_t03_1_4 and the unit suite [T03.1.4].
+before_replay_facts = sum(
+    1 for _ in store.objects_of_type(ObjectType.FACT)
+)
+_claim_before_replay = accepted["en-vendor"].claim.as_text()
+_anchors_after_accept = len(anchors_register)
+replay_refused = False
 en_ref = evidence_ids["en-vendor"]
 try:
-    dup_outcome = extract(
+    extract(
         ExtractionRequest(
             evidence_ref=en_ref,
             subject="bulk edits", predicate="silently fail above",
@@ -467,11 +479,30 @@ try:
         anchors=anchors_register,
     )
 except ExtractionRefusedError:
-    pass
-check("E", "T03.1.1: duplicate extraction reports EQUIVALENT, merges nothing",
-      dup_outcome is not None
-      and any(result is not None for _, result in dup_outcome.equivalence)
-      and dup_outcome.locator == locators["en-vendor"])
+    replay_refused = True
+after_replay_facts = sum(
+    1 for _ in store.objects_of_type(ObjectType.FACT)
+)
+check("E", "T03.1.4: same-Evidence replay refused, nothing re-attached "
+      "[F-I2]",
+      replay_refused
+      and extraction_log.for_evidence(en_ref)[-1].stage
+      is ExtractionStage.MERGE_FAILED
+      and extraction_log.for_evidence(en_ref)[-1].reason
+      == "EVIDENCE_ALREADY_ATTACHED"
+      and after_replay_facts == before_replay_facts)
+
+# the superseded pinned check in its evolved form: the duplicate Fact
+# no longer exists to report against (the replay is refused), so the
+# retained invariants are that the canonical's claim, locator and the
+# anchor registration are EXACTLY as the accepted extraction left them
+# -- the refusal changed nothing [F-I2/T03.1.4]
+# (the locator lives on the refused outcome, not the canonical Fact;
+# canonical anchoring is verified by the anchor checks above)
+check("E", "T03.1.1: canonical claim/anchors untouched by the refused "
+      "replay",
+      accepted["en-vendor"].claim.as_text() == _claim_before_replay
+      and len(anchors_register) == _anchors_after_accept)
 
 # ===========================================================================
 # F. The register: completeness, conflict refusal, outside the model

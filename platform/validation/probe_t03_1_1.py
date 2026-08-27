@@ -19,7 +19,7 @@ Attacks:
   P12  dangling evidence_ref
   P13  qualifier stripping: context dropped between request and Fact
   P14  confidence inflation: extractor asserts above the source ceiling
-  P15  accidental collapse: same claim from two Evidence stays two Facts
+  P15  same claim from two Evidence merges into one canonical [T03.1.4]
   P16  near-duplicate: differing qualifier must not merge [S-3]
   P17  value-precision: values outside stated precision must not merge
   P18  clock behind the source timeline [V8]
@@ -452,12 +452,18 @@ o2 = extract(
     rig15.extraction(evidence_ref=rb),
     store=rig15.store, log=rig15.log, clock=lambda: T0 + timedelta(minutes=2),
 )
-probe("P15 identical claims stay distinct Facts [S-3 under-merge]",
+# PROVENANCE (T03.1.4): P15 pinned the interim boundary "identical
+# claims stay distinct Facts". D-05 supersedes it: identical claims now
+# MERGE into the canonical as a new version. The under-merge protection
+# is retained where it belongs -- UNCERTAIN/CONTAINMENT still never
+# merge (P16/P17 unchanged).
+probe("P15 identical claims merge into one canonical [D-05/T03.1.4]",
       o1.object_id != o2.object_id
-      and rig15.store.get_fact(o1.object_id) is not None
-      and rig15.store.get_fact(o2.object_id) is not None
-      and o2.equivalence
-      and o2.equivalence[0][1].verdict is Verdict.EQUIVALENT,
+      and o2.merged_into is not None
+      and rig15.store.find(o1.object_id).status is ObjectStatus.SUPERSEDED
+      and rig15.store.get_fact(o2.object_id).attachment_count == 2
+      and rig15.store.get_fact(o2.object_id).merge_history[-1].verdict
+      is Verdict.EQUIVALENT,
       f"{o1.object_id} vs {o2.object_id}")
 
 # P16 -- near-duplicate (qualifier differs) ----------------------------------------------

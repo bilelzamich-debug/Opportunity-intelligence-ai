@@ -426,6 +426,12 @@ class TestExtractionIntegration:
         assert len(register) == 0  # only accepted extractions register
 
     def test_reextraction_of_same_span_is_idempotent_in_register(self):
+        # PROVENANCE (T03.1.4, supersedes the interim T03.1.1 boundary):
+        # re-extracting the SAME Evidence used to produce a second
+        # identical Fact; under D-05 it is a REPLAY of already-attached
+        # Evidence and is refused with a recorded failure (F-I2 refuses
+        # a second attachment of the same Evidence). The register keeps
+        # exactly its original entry.
         rig, ref = changelog_rig()
         register = PositionalAnchorRegister()
         first = extract(
@@ -433,13 +439,18 @@ class TestExtractionIntegration:
             store=rig.store, log=rig.log, clock=lambda: TICK,
             anchors=register,
         )
-        second = extract(
-            rig.extraction(evidence_ref=ref),
-            store=rig.store, log=rig.log, clock=lambda: TICK,
-            anchors=register,
-        )
-        assert first.locator == second.locator
-        assert len(register) == 1  # same key, same locator: no conflict
+        with pytest.raises(ExtractionRefusedError):
+            extract(
+                rig.extraction(evidence_ref=ref),
+                store=rig.store, log=rig.log, clock=lambda: TICK,
+                anchors=register,
+            )
+        failure = rig.log.for_evidence(ref)[-1]
+        assert failure.stage is ExtractionStage.MERGE_FAILED
+        assert failure.reason == "EVIDENCE_ALREADY_ATTACHED"
+        assert failure.attempted
+        assert first.locator is not None
+        assert len(register) == 1  # nothing new registered by the replay
 
     def test_anchor_not_resolvable_is_an_attempted_stage(self):
         # N-10: the judgement ran against content in hand, so a refusal at
