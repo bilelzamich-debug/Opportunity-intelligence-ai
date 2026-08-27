@@ -34,12 +34,22 @@ MUTATIONS = [
     # -- S-5 layer 1: anchor gates ---------------------------------------
     ("M1 anchor-uniqueness gate skipped: ambiguous spans admit",
      SRC,
-     "    if occurrences > 1:",
-     "    if False:"),
+     """    if occurrences > 1:
+        # Preserve uncertainty instead of resolving it: an ambiguous
+        # location is refused, never guessed. [AC2]
+        failure = _failure(""",
+     """    if False:
+        # Preserve uncertainty instead of resolving it: an ambiguous
+        # location is refused, never guessed. [AC2]
+        failure = _failure("""),
     ("M2 anchor-presence gate skipped: fabricated locations admit",
      SRC,
-     "    if occurrences == 0:",
-     "    if False:"),
+     """    occurrences = _locate(body, request.anchor)
+    if occurrences == 0:
+        failure = _failure(""",
+     """    occurrences = _locate(body, request.anchor)
+    if False:
+        failure = _failure("""),
     ("M3 layer-1 component check skipped: unsupported claims admit",
      SRC,
      "    if missing:",

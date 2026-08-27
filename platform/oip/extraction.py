@@ -86,6 +86,34 @@ without changing the attachment model or any T03.1.1 behavior:
   content. Installing them store-wide at acceptance is T03.2.1; here they
   are delivered and demonstrated.
 
+CLAIM DECOMPOSITION (T03.1.2)
+------------------------------
+S-3 forces or rejects: every claim the engine carries must decompose to
+the four-component structure, and the decomposition must be a
+*comparable* claim -- one the S-3 equivalence test can judge. `as_claim`
+projects; `decompose()` proves. Fail-closed:
+
+- a Quantity value or precision that is not a real number (bool is an
+  int subtype in Python and is refused) or is NaN/infinite makes the
+  value-comparison arithmetic undefined; a claim carrying one could
+  never be judged equivalent to anything, itself included. Refused,
+  never forced. [S-3, AC2]
+- the self-equivalence witness: `assess_equivalence(claim, claim)` must
+  return EQUIVALENT. A claim not equivalent to itself does not support
+  the comparison the structure exists to support. [T03.1.2 AC2]
+- decomposition invents nothing: components travel byte-identical from
+  the request; synonyms are not resolved (S-3: subject/predicate
+  identity "still require judgement" -- NOT_EQUIVALENT, never merged);
+  qualifier containment is recognised only in the unambiguous case;
+  compound inputs stay ONE verbatim claim (granularity is the
+  extractor's duty -- one request = one claim; M-19 stays open).
+
+A decomposition failure refuses the extraction with a recorded
+DECOMPOSITION_FAILED failure (attempted stage, N-10). No Fact is
+created; no positional anchor is registered for a refused extraction.
+Merging is never executed here -- verdicts and actions are reported
+only (T03.1.4 executes D-05).
+
 WHAT IS IMPLEMENTED (the three T03.1.1 acceptance criteria)
 ------------------------------------------------------------
 - AC1  Claims interpretable without reading the Evidence: one request per
@@ -121,6 +149,7 @@ AnchorVerifier's ratified semantics). T03.1.3 generalises locators.
 
 from __future__ import annotations
 
+import math
 import re
 import threading
 from dataclasses import dataclass, field
@@ -129,7 +158,14 @@ from enum import Enum
 from typing import Callable, Iterator
 
 from oip.acceptance import FailureRecord, RuleOutcome, RuleResult
-from oip.claim import Claim, EquivalenceResult, Quantity, UNQUALIFIED
+from oip.claim import (
+    Claim,
+    EquivalenceResult,
+    Quantity,
+    UNQUALIFIED,
+    Verdict,
+    assess_equivalence,
+)
 from oip.contract import (
     Confidence,
     Engine,
@@ -161,6 +197,13 @@ class ExtractionRefusedError(ExtractionError):
     that does not exist because it was never attempted."""
 
 
+class DecompositionError(ExtractionError):
+    """A claim cannot be decomposed to the S-3 structure as a comparable
+    claim. [T03.1.2] Fail-closed: S-3's "forced or rejected" resolves to
+    rejected -- a claim the structure carries but comparison cannot is
+    refused, never repaired by invention."""
+
+
 # ---------------------------------------------------------------------------
 # Failure records  [N-10]
 # ---------------------------------------------------------------------------
@@ -171,7 +214,8 @@ class ExtractionStage(str, Enum):
 
     Order mirrors evaluation: request validity, Evidence resolution and
     usability, temporal consistency, content, anchor resolution, Layer-1
-    component presence, positional round-trip, persistence."""
+    component presence, positional round-trip, claim decomposition,
+    persistence."""
 
     INVALID_REQUEST = "INVALID_REQUEST"
     EVIDENCE_NOT_FOUND = "EVIDENCE_NOT_FOUND"
@@ -181,6 +225,7 @@ class ExtractionStage(str, Enum):
     ANCHOR_NOT_FOUND = "ANCHOR_NOT_FOUND"
     AMBIGUOUS_ANCHOR = "AMBIGUOUS_ANCHOR"
     ANCHOR_NOT_RESOLVABLE = "ANCHOR_NOT_RESOLVABLE"
+    DECOMPOSITION_FAILED = "DECOMPOSITION_FAILED"
     UNSUPPORTED_CLAIM = "UNSUPPORTED_CLAIM"
     STORE_REJECTED = "STORE_REJECTED"
 
@@ -196,6 +241,7 @@ _ATTEMPTED_STAGES = frozenset(
         ExtractionStage.ANCHOR_NOT_FOUND,
         ExtractionStage.AMBIGUOUS_ANCHOR,
         ExtractionStage.ANCHOR_NOT_RESOLVABLE,
+        ExtractionStage.DECOMPOSITION_FAILED,
         ExtractionStage.UNSUPPORTED_CLAIM,
         ExtractionStage.STORE_REJECTED,
     }
@@ -576,6 +622,69 @@ class ExtractionRequest:
 
 
 # ---------------------------------------------------------------------------
+# Claim decomposition  [T03.1.2]
+# ---------------------------------------------------------------------------
+
+
+def decompose(request: ExtractionRequest) -> Claim:
+    """Decompose one request into the S-3 claim structure. [AC1]
+
+    S-3: "Claims not fitting subject-predicate-qualifier-value must be
+    forced or rejected." The request construction already forces the
+    structure; decomposition additionally REJECTS what the structure
+    would carry but comparison cannot [AC2]:
+
+    - a Quantity value or precision that is not a real number, or is
+      NaN/infinite, makes the value-agreement arithmetic undefined -- a
+      claim carrying one could never be judged equivalent to anything,
+      itself included. Refused, never repaired.
+    - the self-equivalence witness: the decomposed claim must be
+      EQUIVALENT to itself, or the structure does not support the
+      comparison it exists to support.
+
+    Decomposition invents nothing: the components travel byte-identical
+    from the request; synonyms are not resolved; compound inputs stay
+    one verbatim claim. [M-19 stays open]
+    """
+    if not isinstance(request, ExtractionRequest):
+        raise DecompositionError(
+            f"expected an ExtractionRequest, got {request!r}"
+        )
+    claim = request.as_claim()
+    quantity = claim.value
+    if quantity is not None:
+        for name, number in (
+            ("value", quantity.value),
+            ("precision", quantity.precision),
+        ):
+            if isinstance(number, bool) or not isinstance(number, (int, float)):
+                raise DecompositionError(
+                    f"quantity {name} must be a real number, got "
+                    f"{number!r}; the structure supports comparison "
+                    f"[S-3, T03.1.2 AC2]"
+                )
+            if not math.isfinite(number):
+                raise DecompositionError(
+                    f"quantity {name} must be finite, got {number!r}; "
+                    f"a non-finite value makes the agreement comparison "
+                    f"undefined [S-3, T03.1.2 AC2]"
+                )
+    witness = assess_equivalence(claim, claim)
+    if witness.verdict is not Verdict.EQUIVALENT:
+        # Defensive by construction: finite real values guarantee the
+        # witness holds (the finiteness gate above refuses anything
+        # else). Checked rather than assumed so a future change to Claim
+        # or Quantity that breaks comparability fails here, closed,
+        # instead of silently writing incomparable Facts. Wiring is
+        # proven by test_witness_gate_is_wired_not_decorative.
+        raise DecompositionError(
+            f"the decomposed claim is not equivalent to itself: "
+            f"{witness.reason} [S-3, T03.1.2 AC2]"
+        )
+    return claim
+
+
+# ---------------------------------------------------------------------------
 # S-5 Layer 1 -- the mechanical span gates
 # ---------------------------------------------------------------------------
 
@@ -862,8 +971,23 @@ def extract(
         )
         raise _refuse(failure)
 
+    # -- Decompose the claim into the S-3 structure. [T03.1.2 AC1]
+    # Fail-closed: a claim the structure cannot carry as a comparable
+    # claim (a non-real or non-finite Quantity, a broken self-equivalence
+    # witness) refuses with a recorded failure -- S-3's "forced or
+    # rejected" resolves to rejected. [N-10]
+    try:
+        claim = decompose(request)
+    except DecompositionError as exc:
+        failure = _failure(
+            request, request.evidence_ref,
+            ExtractionStage.DECOMPOSITION_FAILED, "NOT_DECOMPOSABLE",
+            f"the claim does not satisfy the S-3 structure as a "
+            f"comparable claim: {exc} [S-3, T03.1.2]", log, now,
+        )
+        raise _refuse(failure) from exc
+
     # -- Compose the Fact. [AC1, AC2, R-3, IOM S 3.2]
-    claim = request.as_claim()
     support = evidence.attributes.confidence.effective_confidence
     identity = store.allocator.new_object()
     attributes = UniversalAttributes(
