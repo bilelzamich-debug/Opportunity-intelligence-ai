@@ -1,10 +1,10 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-08-27** — `T03.1.2` closed (claim decomposition, S-3);
-`T03.1.4` is now unblocked (its two dependencies `.2`+`.3` are done).
-Prior state: 2026-08-27 (`T03.1.3` closed), 2026-08-26 (`T03.1.1` closed,
-P3 fact extraction opened);
+Current as of **2026-08-27** — `T03.1.4` closed (canonical-claim merging,
+D-05); `T03.1.6` is now unblocked (its dependency `.4` is done).
+Prior state: 2026-08-27 (`T03.1.2`, `T03.1.3` closed), 2026-08-26
+(`T03.1.1` closed, P3 fact extraction opened);
 2026-08-19 (D-1 resolved, `T02.1.3` closed, N-24 ratified);
 2026-08-04 (ratification of N-20…N-23).
 
@@ -19,9 +19,24 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T03.1.4` (needs `.2`+`.3`, both done),
+**What is executable now:** `T03.1.6` (needs `.4`, done),
 `T03.1.5` (depends only on `.1`).
-~~`T03.1.2`~~ — ✅ **CLOSED 2026-08-27**: structured claim decomposition
+~~`T03.1.4`~~ — ✅ **CLOSED 2026-08-27**: canonical-claim merging per D-05.
+`extract()` intercepts equivalence BEFORE any write, so an EQUIVALENT
+extraction attaches to the existing canonical Fact as a new version —
+AC1 is mechanical (no duplicate Fact is ever persisted), AC2 is the
+R-1 re-versioning (SUPERSEDED predecessor, allocator-issued version n+1,
+F-I4 justification), AC3 keeps UNCERTAIN/CONTAINMENT separate with
+DUPLICATES on the new Fact. The V5 ceiling is re-derived as the min over
+the widened upstream set (weak corroborators govern; never inherited);
+N-16 independence is never inferred; density counts ACTIVE Facts only.
+SUPERSEDED is terminal [R-2]: the interim restore-on-failure contract was
+impossible and is superseded in the spec with the structural-closure
+argument; MERGE_FAILED refusals (replay/race/acceptance/registry-gap)
+name the exact surviving state [N-10]. Interim "never merges" pins
+re-semantified with provenance. Suite 3,610 unit + 128 stress; verifier
+29/29; probes 10/10; mutation 15/15 (plus 16/16, 11/11, 16/16 evolved);
+exit gates 26/26 + 94/94. ~~`T03.1.2`~~ — ✅ **CLOSED 2026-08-27**: structured claim decomposition
 per S-3. `decompose()` in `oip/extraction.py` projects the four S-3
 components byte-identically and fail-closes on what the structure would
 carry but comparison cannot (non-real/non-finite Quantity → recorded

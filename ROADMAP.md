@@ -116,8 +116,10 @@ mutation 11/11. Every claim decomposed byte-identically to the
 four-component structure; non-comparable quantities rejected with
 recorded DECOMPOSITION_FAILED refusals; every verdict recomputable from
 the four structure checks; merge policy reported, never executed
-(T03.1.4's boundary). M-19 stays open. Next: `T03.1.5` (claim-type
-classification); `T03.1.4` (merging) unblocked.
+(T03.1.4's boundary). M-19 stays open. `T03.1.4` (merging) ✅ **CLOSED
+2026-08-27** — EQUIVALENT extractions attach to the canonical Fact as a
+new version; UNCERTAIN/CONTAINMENT stay separate with DUPLICATES. Next:
+`T03.1.5` (claim-type classification); `T03.1.6` unblocked.
 
 | Marker | Gap |
 |---|---|
