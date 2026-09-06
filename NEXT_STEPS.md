@@ -1,10 +1,12 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-09-06** — `T03.1.5` closed on existing evidence
-(F-V4 classification; verifier 42/42; no production change). The S-3
-cluster awaits only `T03.1.6`; `T03.2.1` (critical-path ⚠) selected by
-dependency depth and in progress.
+Current as of **2026-09-06** — `T03.2.1` closed (anchor verification at
+acceptance for 100% of Facts; verifier 27/27, probes 19/19, mutation
+7/7; `anchoring.py` only — frozen modules byte-identical) and
+`T03.1.5` closed on existing evidence (F-V4; verifier 42/42).
+Executable now: `T03.2.2` (critical path, deps met), `T03.1.6`
+(S-3 cluster completion).
 Prior state: 2026-08-27 (`T03.1.4` closed, canonical-claim merging, D-05;
 `T03.1.6` unblocked), 2026-08-27 (`T03.1.2`, `T03.1.3` closed),
 2026-08-26 (`T03.1.1` closed, P3 fact extraction opened);
@@ -22,10 +24,22 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T03.2.1` (deps `T03.1.3`+`T01.4.6` closed;
-⚠ critical path — selected over `T03.1.6` by dependency-depth analysis,
-since it gates `T03.2.2 → T03.2.3 → T03.3.1` where `.6` gates only the
-exit), `T03.1.6` (needs `.4`, done).
+**What is executable now:** `T03.2.2` (sampled drift audit; ⚠ critical
+path — its dependency `T03.2.1` closed 2026-09-06), `T03.1.6`
+(contradiction detection; needs `.4`, done — gates only the P3 exit, so
+`T03.2.2` leads by dependency-depth analysis).
+~~`T03.2.1`~~ — ✅ **CLOSED 2026-09-06**: the ratified S-5 Layer-1
+`AnchorVerifier` installs onto the store's existing live slot via
+`install_anchor_verification(store)` in `oip/anchoring.py`; with it
+installed, F-V6 runs on EVERY Fact write (all attachments, every merge
+re-version), refusing fabricated locations, absent/ambiguous spans,
+dangling references and REFERENCE-mode material at the acceptance
+boundary with recorded N-10 failure. Opt-in default preserved (P1-pinned
+SKIP when uninstalled); finding T03.2.1-F1 (payload-free FACT shells via
+generic `store.write` skip the type rules — pre-existing P1 surface)
+surfaced for the Owner. Suite 3,632 unit + 128 stress; verifier 27/27;
+probes 19/19; mutation 7/7 (two initial survivors fixed: dead guards
+removed, REFERENCE-with-content test added).
 ~~`T03.1.5`~~ — ✅ **CLOSED 2026-09-06 ON EXISTING EVIDENCE**: F-V4 is
 enforced at five layers (request, claim projection, Fact construction,
 acceptance rule, merge versioning), demonstrated mechanically

@@ -1,0 +1,37 @@
+--- section A ---
+[PASS] AC1: attachment positional anchor resolves to the exact span
+[PASS] AC1: the attachment anchor IS the verbatim span (T03.1.1 convention) and resolves in place
+[PASS] AC1: a positional locator resolves to the same bytes in the same store (dual convention, direct slice)
+[PASS] AC1: F-V6 PASSes through the ratified rule with the store-wide wiring  (1 claim(s) located; paraphrase drift not covered [M-67])
+--- section B ---
+[PASS] AC2: out-of-bounds locator refused at acceptance
+[PASS] AC2: reversed range refused at acceptance
+[PASS] AC2: absent verbatim span refused at acceptance
+[PASS] AC2: ambiguous verbatim span refused at acceptance
+[PASS] AC2: non-numeric junk refused at acceptance
+[PASS] AC2: the refusal is a recorded N-10 failure naming F-V6
+[PASS] AC2: a refused fabrication leaves no payload behind
+--- section C ---
+[PASS] AC3: checked == attachments of EVERY accepted Fact write (fresh=1 + merge=2)  (checked=3)
+[PASS] AC3: the rule is unconditional in FACT_RULES (no sampling knob)
+[PASS] AC3: with no verifier installed the rule SKIPs with the M-67 text -- it never fabricates a pass
+[PASS] AC3: the merged re-version re-ran verification over BOTH attachments against live content
+--- section D ---
+[PASS] default store: unconfigured (P1-pinned; install is opt-in)
+[PASS] install binds the store's live slot
+[PASS] double install REFUSES to clobber silently
+[PASS] replace=True is the only, explicit swap path
+--- section E ---
+[PASS] REFERENCE-mode payload: provider answers None [N-15]
+[PASS] dangling evidence_ref: provider answers None
+--- section F ---
+[PASS] installed verifier declares covers_paraphrase_drift=False
+[PASS] the PASS text keeps stating what Layer 1 does not cover  (1 claim(s) located; paraphrase drift not covered [M-67])
+[PASS] anchor_failure_rate is exposed and honest (0.0 on a clean corpus: 1 attachment via the engine write + 1 via this direct call)
+--- section G ---
+[PASS] replay of the same corpus+attack yields identical verification arithmetic  ([(2, 1), (2, 1)])
+--- section H ---
+[PASS] git status: within oip/, ONLY anchoring.py differs from HEAD (frozen P1/P2 modules byte-identical)  (M platform/oip/anchoring.py)
+[PASS] extraction.py unchanged at the hash level (engine path untouched by the wiring)
+
+T03.2.1 verifier: 27/27 checks

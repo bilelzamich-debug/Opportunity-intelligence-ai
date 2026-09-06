@@ -1,0 +1,11 @@
+baseline (unmutated) ... pass
+  killed    M1 dangling-evidence guard removed: a None payload must raise, the test contract demands None
+  killed    M2 REFERENCE-mode payload treated as verifiable in place [N-15]
+  killed    M2b provider reads attributes instead of the content half
+  killed    M4 install silently clobbers an existing verifier
+  killed    M5 install builds the verifier but never binds it to the store
+  killed    M6 installed verifier receives no claims_of: F-V6 degrades to SKIP
+  killed    M7 projection presents zero claims for real Facts (empty-verification)
+
+killed: 7/7; survivors: 0 (expected-equivalent: 0)
+EXIT=0

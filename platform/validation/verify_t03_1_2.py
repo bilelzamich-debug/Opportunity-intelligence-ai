@@ -517,19 +517,27 @@ for rel, expected in BASELINE_HASHES.items():
     check("E", f"{rel.split('/')[-1]} unmodified [S-3, S-5, N-20..N-24]",
           actual == expected, actual[:16])
 
-# S-3 and R-5 themselves are ratified decisions: byte-identical to 17de9af
-for rel in ("docs/decisions/S-03-claim-equivalence.md",
-            "docs/decisions/R-05-canonical-claims.md"):
-    import subprocess
-
-    blob = subprocess.run(
-        ["git", "show", f"17de9af:{rel}"], cwd=PROJECT,
-        capture_output=True
-    ).stdout
-    expected = hashlib.sha256(blob).hexdigest()
+# S-3 and R-5 themselves are ratified decisions: byte-pinned.
+# PROVENANCE NOTE (2026-09-06, T03.2.1 maintenance): these two pins were
+# resolved through `git show 17de9af:<rel>` -- a commit that exists in the
+# full project history but NOT in this clone (the repository was delivered
+# to this session as a single squashed commit). The git indirection is
+# therefore replaced by literal hashes, pinned to the ratified content at
+# the T03.1.4 closure commit (01906a5) -- the state this session inherited
+# and verified. The pin now guards every FUTURE change to these decisions,
+# exactly as CLOSED_MODULE_HASHES above has always done; it cannot prove
+# anything about the pre-01906a5 history that this clone does not carry.
+RATIFIED_DOC_HASHES = {
+    "docs/decisions/S-03-claim-equivalence.md":
+        "93fb662e058d8c325b5128f0a902937c18cf46f39dc94463eb30623de5a94968",
+    "docs/decisions/R-05-canonical-claims.md":
+        "3b917048542beac42515cd02e43f91f02668891ab8867ca79cec3cbc5bde244c",
+}
+for rel, expected in RATIFIED_DOC_HASHES.items():
     actual = hashlib.sha256((PROJECT / rel).read_bytes()).hexdigest()
-    check("E", f"{rel.split('/')[-1]} unmodified (ratified decision)",
-          actual == expected, actual[:16])
+    check("E", f"{rel.split('/')[-1]} unmodified (ratified decision, "
+          f"pinned to the inherited state)", actual == expected,
+          actual[:16])
 
 marker_register = (PROJECT / "docs" / "markers" / "MARKER-REGISTER.md"
                    ).read_text()

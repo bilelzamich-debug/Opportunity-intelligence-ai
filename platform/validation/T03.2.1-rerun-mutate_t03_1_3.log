@@ -1,0 +1,21 @@
+baseline (unmutated) ... pass
+  killed    M1 grammar check skipped: any string parses as a locator
+  killed    M2 Unicode digits leak past the ASCII-only grammar
+  killed    M3 bounds check skipped: out-of-range locators resolve
+  killed    M4 empty/inverted spans resolve instead of refusing
+  killed    M5 ambiguous span: locator guessed as the first occurrence
+  killed    M6 absent span: phantom locator at find() == -1
+  killed    M7 locator off by one: end drifts past the span
+  killed    M8 registration skipped: accepted Facts never anchored in register
+  killed    M9 ANCHOR_NOT_RESOLVABLE misreported as not-attempted [N-10]
+  killed    M10 register conflict silently overwrites the original anchor
+  killed    M11 provider stops resolving positional locators
+  killed    M12 provider raises instead of the protocol's unresolvable None
+  killed    M13 provider admits ambiguous verbatim spans
+  killed    M14 projection fabricates a value the Fact never carried
+  killed    M15 projection drops the subject (weakened layer-1 check)
+  killed    M16 projection rewrites the anchor (F-I3 broken)
+
+killed 16/16; survivors 0; inapplicable 0
+sources restored byte-identical: True
+MUT313_EXIT=0

@@ -7,6 +7,56 @@ Dates are the project's own recorded dates.
 
 ---
 
+## 2026-09-06 — `T03.2.1` closed: anchor verification at acceptance (F-V6)
+
+### Implemented — the S-5 Layer-1 bridge goes live
+
+`oip/anchoring.py` gains exactly two public functions, pure composition of
+ratified machinery: `store_span_provider(store)` resolves an anchor against
+the store's Evidence payloads (dangling references and REFERENCE-mode
+material resolve to nothing — fail closed, per N-15 and the ratified
+`is_verifiable_in_place` predicate), and `install_anchor_verification(store)`
+binds the frozen `AnchorVerifier` onto the store's existing live slot so
+the existing `F-V6` acceptance rule runs on **every** Fact write — every
+attachment of every version, including T03.1.4 merge re-versions. No frozen
+module changed; `fact.py`, `store.py`, `acceptance.py`, `semantic.py` and
+`extraction.py` are byte-identical (git-verified). Installation is opt-in:
+the P1-pinned default (`anchor_verifier = None` → F-V6 SKIP with the M-67
+text) is untouched, and a double install refuses to clobber silently.
+
+**Not closed by this act:** M-67 (paraphrase drift) — Layer 1 measures
+fabricated location only, and the installed PASS text keeps saying so.
+
+### Evidence
+
+Suite 3,632 unit + 128 stress, all passing; coverage `anchoring.py` 100%,
+total 99.2%. `verify_t03_2_1.py` 27/27; `probe_t03_2_1.py` 19/19;
+`mutate_t03_2_1.py` 7/7 mutants killed, zero survivors. P2/P3 verifier
+regression set re-run green (closure 60/60; P1 exit gate 94/94;
+`verify_t03_1_3` 47/47; the eight `verify_t02_*` scripts unchanged).
+
+### Verification paid for itself — twice
+
+1. `verify_t03_1_5.py`'s first run discovered the live merge path
+   **subsumes a dissenting classification**: an `ATTRIBUTED_OPINION`
+   extraction judged EQUIVALENT to an existing `ASSERTION` canonical merges
+   and keeps the canonical's `claim_type` (S-3's four conditions exclude
+   classification). Recorded as a finding for the Owner, not patched.
+2. The first mutation run for T03.2.1 killed nothing for two of its
+   mutants — one exposed a **dead guard** in the initial design (proven
+   equivalent; removed), the other a **real test gap** (a REFERENCE-mode
+   payload that happens to retain content). The guard was rewritten around
+   the ratified `is_verifiable_in_place` predicate, the missing test was
+   added, and the rerun killed 7/7.
+
+### Maintenance — `verify_t03_1_2` stale pin repaired (Category B)
+
+Its `git show 17de9af:<decision>` indirection does not resolve in this
+clone (delivered as a single squashed commit), so two decision-doc checks
+failed against an empty blob. The pins are now literal hashes of the
+inherited ratified content, with the provenance and the limits of the claim
+stated in the script. Not a content change; not a silent skip.
+
 ## 2026-09-06 — `T03.1.5` closed on existing evidence (F-V4 classification)
 
 ### Verified — nothing built, everything proven

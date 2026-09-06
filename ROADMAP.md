@@ -12,7 +12,7 @@ begins. Phase boundaries come from PKP v1 §9; blocking markers from PKP v2 §14
 | **P0** | Specification | 37 decisions | ✅ **CLOSED** | — |
 | **P1** | Foundation | 44 | ✅ **CLOSED** 2026-08-04 | — |
 | **P2** | Research Engine | 10 | ✅ **CLOSED 2026-08-26** | — |
-| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1`–`T03.1.5` closed — `.5` closed 2026-09-06 on existing evidence; `T03.2.1` in progress) | M-19, M-20 |
+| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1`–`T03.1.5` and `T03.2.1` closed 2026-09-06; critical path: `T03.2.2` next) | M-19, M-20 |
 | **P4** | Problem Intelligence | ~12 | ⬜ | M-12, M-21, M-22, M-06 |
 | **P5** | Pattern Intelligence | ~14 | ⬜ | M-23, M-24, M-25, M-13 |
 | **P6** | Opportunity Intelligence | ~18 | ⬜ | C-01, M-14, M-26, M-27 |
@@ -99,6 +99,16 @@ impossible until the N-24 role is staffed and supplies assessments
 
 **Goal.** Convert Evidence into canonical, individually verifiable claims. The
 platform's integrity floor.
+
+**`T03.2.1` ✅ CLOSED 2026-09-06** — anchor verification at acceptance
+(F-V6, S-5 Layer 1): `install_anchor_verification(store)` binds the
+ratified `AnchorVerifier` on the store's live slot; `store_span_provider`
+resolves anchors from FULL-mode Evidence only (dangling and REFERENCE-mode
+fail closed). 100% of Facts through the Fact write path — merges included
+— every write; fabricated anchors refused with recorded failures.
+`oip/anchoring.py` is the only production file changed; frozen modules
+byte-identical. Verifier 27/27; probes 19/19; mutation 7/7;
+`anchoring.py` coverage 100%. Unblocks `T03.2.2` (⚠ critical path).
 
 **`T03.1.5` ✅ CLOSED 2026-09-06 on existing evidence** — F-V4
 assertion-vs-attributed-opinion classification: five enforcement layers

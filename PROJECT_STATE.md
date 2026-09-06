@@ -1,9 +1,11 @@
 # Project State
 
 **Authoritative statement of where the Opportunity Intelligence Platform stands.**
-Last updated: **2026-09-06** — `T03.1.5` closed on existing evidence
-(assertion vs attributed-opinion classification, F-V4; verifier 42/42).
-Prior updates: 2026-08-27 (`T03.1.4` closed), 2026-08-27 (`T03.1.2` and
+Last updated: **2026-09-06** — `T03.2.1` closed (anchor verification at
+acceptance for 100% of Facts — the S-5 Layer 1 bridge installed on the
+store's live slot; no frozen module changed).
+Prior updates: 2026-09-06 (`T03.1.5` closed on existing evidence, F-V4),
+2026-08-27 (`T03.1.4` closed), 2026-08-27 (`T03.1.2` and
 `T03.1.3` closed), 2026-08-26 (`T03.1.1` closed; P2 closed), 2026-08-19
 (D-1 resolved, `T02.1.3` closed, N-24 ratified), 2026-08-04 (ratification
 of N-20…N-23).
@@ -20,7 +22,7 @@ recalled. Where a number could not be verified, that is stated.
 | **P0** | Specification | ✅ **CLOSED** | 37 decisions ratified; `T00.7.1` exit gate passed |
 | **P1** | Foundation | ✅ **CLOSED** 2026-08-04 | 44/44 tasks, 134/134 acceptance criteria, 60/60 closure checks |
 | **P2** | Research Engine | ✅ **CLOSED 2026-08-26** | All 10 tasks CLOSED (F02.1+F02.2+exit); 8/8 source types acquired; coverage=1.0; 6 decisions ratified |
-| **P3** | Fact Extraction | 🟡 **In progress** — `T03.1.1`–`T03.1.5` CLOSED (08-26/08-27/08-27/08-27/09-06; `.5` closed on existing evidence); the S-3 cluster awaits only `T03.1.6` (unblocked); `T03.2.1` in progress | — |
+| **P3** | Fact Extraction | 🟡 **In progress** — `T03.1.1`–`T03.1.5` and `T03.2.1` CLOSED (`.5` 09-06 on existing evidence; `.2.1` 09-06); open: `T03.1.6` (S-3 cluster) and the fidelity chain `T03.2.2 → T03.2.3 → T03.3.1` | — |
 | **P4** | Problem Intelligence | ⬜ Not started | — |
 | **P5** | Pattern Intelligence | ⬜ Not started | — |
 | **P6** | Opportunity Intelligence | ⬜ Not started | — |
@@ -60,12 +62,12 @@ supersessions.** No frozen document was rewritten.
 | Metric | Value | How verified |
 |---|---|---|
 | Production modules | **37** | `ls oip/*.py \| wc -l` |
-| Production lines | **22,148** | `wc -l oip/*.py` |
-| Test files | **46** | `ls tests/*.py \| wc -l` |
-| Unit tests | **3,585 passing** | `pytest -q` |
+| Production lines | **22,657** | `wc -l oip/*.py` |
+| Test files | **49** | `ls tests/*.py \| wc -l` |
+| Unit tests | **3,632 passing** | `pytest -q` |
 | Stress tests | **128 passing** | `pytest -q -m stress` |
-| **Total tests** | **3,713 passing, 0 failing** | both suites |
-| Total coverage | **99.2%** | `pytest --cov=oip` |
+| **Total tests** | **3,760 passing, 0 failing** | both suites |
+| Total coverage | **99.2%** (anchoring.py 100%) | `pytest --cov=oip` |
 | Modules below 95% | **0** | mechanical per-module check |
 | Architecture verifiers | **443 checks passing** | 8 verifier scripts |
 | Mutation score (cascade) | 19/20 killed, 1 proven equivalent | `mutate_t01_2_4_r1.py` |
@@ -78,6 +80,7 @@ supersessions.** No frozen document was rewritten.
 | Mutation score (failure recording) | **12/12 killed** | `mutate_t02_2_5.py` |
 | Mutation score (directives) | **14/14 killed** | `mutate_t02_2_4.py` |
 | Mutation score (extraction) | **16/16 killed** | `mutate_t03_1_1.py` |
+| Mutation score (anchor verification wiring) | **7/7 killed, 0 survivors** | `mutate_t03_2_1.py` (after two real finds: one dead-guard cleanup, one test-gap kill) |
 | Mutation score (anchoring) | **16/16 killed** | `mutate_t03_1_3.py` |
 | Mutation score (decomposition) | **11/11 killed** | `mutate_t03_1_2.py` |
 | Performance regressions | **0** | best-of-3, idle host |
@@ -94,16 +97,17 @@ supersessions.** No frozen document was rewritten.
 | `execution.py` | 1,016 | Execution Record, X-V1…X-V6 |
 | `problem.py` | 993 | Problem type, P-V1…P-V6 |
 
-### 3.3 The 29 Modules
+### 3.3 The 37 Modules
 
 `__init__` · `acceptance` · `calibration` · `cascade` · `claim` ·
 `configuration` · `contract` · `enums` · `evidence` · `execution` · `fact` ·
 `feedback` · `graph` · `identity` · `integrity` · `lifecycle` · `lineage` ·
 `opportunity` · `orchestration` · `pattern` · `problem` · `relationships` ·
-`retention` · `semantic` · `solution` · **`source`** · `store` · `support` ·
-`validation`
-
-`source.py` is the only Phase-2 module. The other 28 are Phase-1 and frozen.
+`retention` · `semantic` · `solution` · `source` · `store` · `support` ·
+`validation` — the 29 of Phase 1, frozen — plus `acquisition`, `coverage`,
+`directives`, `drift`, `duplicates`, `rights` (Phase 2) and `extraction`,
+`anchoring` (Phase 3). The Phase 2 and Phase 3 modules are the active
+surface; the Phase 1 set changes only through the annotation route.
 
 ## 4. Marker Status
 
@@ -164,6 +168,7 @@ These were adopted as **choices**, not derivations, and are now in force.
 
 | Task | Status | Blocker |
 |---|---|---|
+| `T03.2.1` Anchor verification at acceptance | ✅ **CLOSED 2026-09-06** — AC1 ✅ (every accepted attachment's anchor resolves: positional locator by direct slice AND verbatim span by unique occurrence, verified against live store content inside acceptance) AC2 ✅ (fabricated anchors refused at the store boundary: out-of-bounds, reversed range, malformed grammar, Unicode digits, absent span, ambiguous span, dangling `evidence_ref`, REFERENCE-mode payload — content retained or not — all produce `WriteRejectedError`, a failure record naming F-V6, and zero persistence; refusal never poisons the slot) AC3 ✅ (`fv6_anchor_verification` is unconditional in `FACT_RULES`; with the verifier installed it runs on EVERY `write_fact` including every T03.1.4 merge re-version re-verifying ALL accumulated attachments — `verifier.checked` equals the total attachment count of accepted writes, mechanically asserted; no sampling exists at this layer). Wiring: `store_span_provider(store)` + `install_anchor_verification(store, replace=False)` in `oip/anchoring.py` (composition of ratified machinery only; REFERENCE-mode policy delegated to the ratified `EvidenceContent.is_verifiable_in_place`; module graph stays `anchoring → {extraction, fact, semantic}` exactly as pinned by `verify_t03_1_3`). Opt-in default: an unconfigured store keeps P1-pinned SKIP — installation is an assembly act, and T03.1.2's acceptance of payload-free FACT shells via generic `store.write` is recorded as **finding T03.2.1-F1** for the Owner. Suite 3,632 unit + 128 stress; verifier 27/27; probes 19/19; mutation 7/7 (after killing two survivors by removing dead guards and adding a REFERENCE-with-content test — the harness found a real gap, not a cosmetic one); coverage `anchoring.py` 100%; frozen modules byte-identical; `verify_t03_1_2` decision-doc pin re-anchored with provenance (its `git show 17de9af` indirection does not resolve in this single-commit clone — environment artifact, not content drift) | — |
 | `T03.1.5` Assertion vs attributed-opinion classification | ✅ **CLOSED 2026-09-06 ON EXISTING EVIDENCE** — AC1 ✅ (ClaimType is the closed two-member enum; `Fact.claim_type` a required no-default field; populated from `ExtractionRequest` through Claim projection into the stored Fact, preserved by the store round-trip AND across T03.1.4 merge re-versions) AC2 ✅ (ATTRIBUTED_OPINION without non-blank `attributed_to` refused at request, Fact construction, and the `fv4_claim_type_declared` acceptance rule; unknown `claim_type` FAILs at acceptance; rule SKIPs, never guesses, without a payload). Classification is extractor-supplied and platform-ENFORCED, never inferred (N-4/S-3 judgement excluded). Verifier `verify_t03_1_5.py` 42/42 mechanical; two findings surfaced in the specification (constructor-vs-acceptance membership layering; canonical-level classification survives EQUIVALENT merges) — no production file changed; frozen modules byte-identical | — |
 | `T03.1.4` Canonical-claim merging | ✅ **CLOSED 2026-08-27** — AC1 ✅ (an equivalent extraction attaches to the existing canonical Fact — mechanically guaranteed by intercepting equivalence BEFORE any write: no duplicate Fact is ever persisted; the ACTIVE lineage set is unchanged, the head gains the attachment) AC2 ✅ (the merge is a NEW Fact version: predecessor SUPERSEDED same-lineage, version n+1 allocator-issued, F-I2 add-only attachments preserved, EQUIVALENT MergeJustification with evidence linkage and clock stamp [F-I4]) AC3 ✅ (UNCERTAIN/CONTAINMENT never merge: DUPLICATES recorded on the NEW Fact, the peer never re-versioned, containment canonical = the narrower claim). V5 ceiling RE-DERIVED as the min over the complete widened upstream Evidence set (a weak corroborator legitimately lowers support; never inherited); assertion confidence = min(predecessor, extraction); N-16 independence never inferred; density counts ACTIVE Facts only. SUPERSEDED is terminal [R-2]: the restore-on-failure design was impossible and the spec records the revision — the failure surface is closed structurally, residual refusals name the exact surviving state [N-10]. MERGE_FAILED attempted stage: EVIDENCE_ALREADY_ATTACHED / MERGE_NOT_POSSIBLE (CONCURRENT_MERGE reserved, unemitted) / ACCEPTANCE_REFUSED / REGISTRY_GAP. Interim "never merges" pins and validators re-semantified with explicit provenance. Suite 3,610 unit (99.17%) + 128 stress; verifier 29/29 mechanical; probes 10/10 (6 attack classes); mutation 15/15 zero survivors; exit gates 26/26 + 94/94; import set 6/6; frozen modules byte-identical | — |
 | `T03.1.1` Claim extraction | ✅ **CLOSED 2026-08-26** — AC1 ✅ (self-contained S-3-structured claims; F-V3 enforced at construction and acceptance) AC2 ✅ (qualifying_context verbatim; ambiguity refused, never guessed; uncertainty preserved) AC3 ✅ (density measured per Evidence, N-20-stratified, never a gate; spread 4.62× ≤ published 6.0× bound on the 8-record P2 corpus). `oip/extraction.py`: one request = one claim; S-5 layer 1 fail-closed (unique verbatim anchor, components present at span — pinned to AnchorVerifier on 200/200 samples); refusals recorded (N-10) with FailureStore projection; equivalence reported per S-3, never merged (T03.1.4). Module coverage 100%; verifier 42/42; probes 25/25; mutation 16/16 | — |
@@ -224,7 +229,7 @@ its cost.
 
 ```bash
 cd platform
-python -m pytest -q                              # 3,585 pass
+python -m pytest -q                              # 3,632 pass
 python -m pytest -q -m stress                    # 128 pass
 python -m pytest -q --cov=oip --cov-report=term  # 99.2%
 python validation/closure_t01_8_1.py             # 60/60
@@ -239,9 +244,11 @@ python validation/verify_t02_2_5.py              # 23/23
 python validation/verify_t02_2_4.py              # 30/30
 python validation/verify_t02_3_1.py              # 17/17
 python validation/verify_t03_1_1.py              # 42/42
-python validation/verify_t03_1_3.py              # 46/46
+python validation/verify_t03_1_3.py              # 47/47
 python validation/verify_t03_1_2.py              # 39/39
 python validation/verify_t03_1_5.py              # 42/42
+python validation/verify_t03_2_1.py              # 27/27
+python validation/probe_t03_2_1.py               # 19/19 (adversarial, run first)
 ```
 
 ## 11. Known Environment Constraints
