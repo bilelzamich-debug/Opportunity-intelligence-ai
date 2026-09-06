@@ -1,11 +1,12 @@
 # Project State
 
 **Authoritative statement of where the Opportunity Intelligence Platform stands.**
-Last updated: **2026-08-27** — `T03.1.4` closed (canonical-claim merging,
-D-05).
-Prior updates: 2026-08-27 (`T03.1.2` and `T03.1.3` closed), 2026-08-26
-(`T03.1.1` closed; P2 closed), 2026-08-19 (D-1 resolved, `T02.1.3` closed,
-N-24 ratified), 2026-08-04 (ratification of N-20…N-23).
+Last updated: **2026-09-06** — `T03.1.5` closed on existing evidence
+(assertion vs attributed-opinion classification, F-V4; verifier 42/42).
+Prior updates: 2026-08-27 (`T03.1.4` closed), 2026-08-27 (`T03.1.2` and
+`T03.1.3` closed), 2026-08-26 (`T03.1.1` closed; P2 closed), 2026-08-19
+(D-1 resolved, `T02.1.3` closed, N-24 ratified), 2026-08-04 (ratification
+of N-20…N-23).
 
 Every figure in this document was verified by execution or extraction, not
 recalled. Where a number could not be verified, that is stated.
@@ -19,7 +20,7 @@ recalled. Where a number could not be verified, that is stated.
 | **P0** | Specification | ✅ **CLOSED** | 37 decisions ratified; `T00.7.1` exit gate passed |
 | **P1** | Foundation | ✅ **CLOSED** 2026-08-04 | 44/44 tasks, 134/134 acceptance criteria, 60/60 closure checks |
 | **P2** | Research Engine | ✅ **CLOSED 2026-08-26** | All 10 tasks CLOSED (F02.1+F02.2+exit); 8/8 source types acquired; coverage=1.0; 6 decisions ratified |
-| **P3** | Fact Extraction | 🟡 **In progress** — `T03.1.1`/`T03.1.2`/`T03.1.3`/`T03.1.4` CLOSED (08-26/08-27/08-27/08-27); `T03.1.5` remains the open S-3-cluster task; `T03.1.6` unblocked (needs `.4`, done) | — |
+| **P3** | Fact Extraction | 🟡 **In progress** — `T03.1.1`–`T03.1.5` CLOSED (08-26/08-27/08-27/08-27/09-06; `.5` closed on existing evidence); the S-3 cluster awaits only `T03.1.6` (unblocked); `T03.2.1` in progress | — |
 | **P4** | Problem Intelligence | ⬜ Not started | — |
 | **P5** | Pattern Intelligence | ⬜ Not started | — |
 | **P6** | Opportunity Intelligence | ⬜ Not started | — |
@@ -163,6 +164,7 @@ These were adopted as **choices**, not derivations, and are now in force.
 
 | Task | Status | Blocker |
 |---|---|---|
+| `T03.1.5` Assertion vs attributed-opinion classification | ✅ **CLOSED 2026-09-06 ON EXISTING EVIDENCE** — AC1 ✅ (ClaimType is the closed two-member enum; `Fact.claim_type` a required no-default field; populated from `ExtractionRequest` through Claim projection into the stored Fact, preserved by the store round-trip AND across T03.1.4 merge re-versions) AC2 ✅ (ATTRIBUTED_OPINION without non-blank `attributed_to` refused at request, Fact construction, and the `fv4_claim_type_declared` acceptance rule; unknown `claim_type` FAILs at acceptance; rule SKIPs, never guesses, without a payload). Classification is extractor-supplied and platform-ENFORCED, never inferred (N-4/S-3 judgement excluded). Verifier `verify_t03_1_5.py` 42/42 mechanical; two findings surfaced in the specification (constructor-vs-acceptance membership layering; canonical-level classification survives EQUIVALENT merges) — no production file changed; frozen modules byte-identical | — |
 | `T03.1.4` Canonical-claim merging | ✅ **CLOSED 2026-08-27** — AC1 ✅ (an equivalent extraction attaches to the existing canonical Fact — mechanically guaranteed by intercepting equivalence BEFORE any write: no duplicate Fact is ever persisted; the ACTIVE lineage set is unchanged, the head gains the attachment) AC2 ✅ (the merge is a NEW Fact version: predecessor SUPERSEDED same-lineage, version n+1 allocator-issued, F-I2 add-only attachments preserved, EQUIVALENT MergeJustification with evidence linkage and clock stamp [F-I4]) AC3 ✅ (UNCERTAIN/CONTAINMENT never merge: DUPLICATES recorded on the NEW Fact, the peer never re-versioned, containment canonical = the narrower claim). V5 ceiling RE-DERIVED as the min over the complete widened upstream Evidence set (a weak corroborator legitimately lowers support; never inherited); assertion confidence = min(predecessor, extraction); N-16 independence never inferred; density counts ACTIVE Facts only. SUPERSEDED is terminal [R-2]: the restore-on-failure design was impossible and the spec records the revision — the failure surface is closed structurally, residual refusals name the exact surviving state [N-10]. MERGE_FAILED attempted stage: EVIDENCE_ALREADY_ATTACHED / MERGE_NOT_POSSIBLE (CONCURRENT_MERGE reserved, unemitted) / ACCEPTANCE_REFUSED / REGISTRY_GAP. Interim "never merges" pins and validators re-semantified with explicit provenance. Suite 3,610 unit (99.17%) + 128 stress; verifier 29/29 mechanical; probes 10/10 (6 attack classes); mutation 15/15 zero survivors; exit gates 26/26 + 94/94; import set 6/6; frozen modules byte-identical | — |
 | `T03.1.1` Claim extraction | ✅ **CLOSED 2026-08-26** — AC1 ✅ (self-contained S-3-structured claims; F-V3 enforced at construction and acceptance) AC2 ✅ (qualifying_context verbatim; ambiguity refused, never guessed; uncertainty preserved) AC3 ✅ (density measured per Evidence, N-20-stratified, never a gate; spread 4.62× ≤ published 6.0× bound on the 8-record P2 corpus). `oip/extraction.py`: one request = one claim; S-5 layer 1 fail-closed (unique verbatim anchor, components present at span — pinned to AnchorVerifier on 200/200 samples); refusals recorded (N-10) with FailureStore projection; equivalence reported per S-3, never merged (T03.1.4). Module coverage 100%; verifier 42/42; probes 25/25; mutation 16/16 | — |
 | `T03.1.3` Positional anchoring | ✅ **CLOSED 2026-08-27** — AC1 ✅ (every accepted Claim/Fact attachment carries a resolvable anchor: verbatim (T03.1.1, preserved byte-for-byte) AND positional, dual-resolvability demonstrated on 100% of the multilingual verification corpus; acceptance-path F-V2 held) AC2 ✅ (locator `chars <start>-<end>`, 0-based half-open code-point indexed; `resolve_locator` is a direct slice — no search of any kind, mechanically source-inspected; the register alone locates the claim with no content in hand). `extract()` computes, round-trip-verifies and registers the locator for every accepted extraction; ANCHOR_NOT_RESOLVABLE refuses fail-closed (attempted stage, N-10). S-5 bridge `oip/anchoring.py`: F-V6 PASSES via the ratified AnchorVerifier on 100% of the corpus; M-67 stays open; acceptance-path wiring is T03.2.1's deliverable. Module coverage 100% (extraction + anchoring); verifier 46/46; probes 26/26; mutation 16/16 | — |
@@ -239,6 +241,7 @@ python validation/verify_t02_3_1.py              # 17/17
 python validation/verify_t03_1_1.py              # 42/42
 python validation/verify_t03_1_3.py              # 46/46
 python validation/verify_t03_1_2.py              # 39/39
+python validation/verify_t03_1_5.py              # 42/42
 ```
 
 ## 11. Known Environment Constraints

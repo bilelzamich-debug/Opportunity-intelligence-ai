@@ -12,7 +12,7 @@ begins. Phase boundaries come from PKP v1 §9; blocking markers from PKP v2 §14
 | **P0** | Specification | 37 decisions | ✅ **CLOSED** | — |
 | **P1** | Foundation | 44 | ✅ **CLOSED** 2026-08-04 | — |
 | **P2** | Research Engine | 10 | ✅ **CLOSED 2026-08-26** | — |
-| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1`/`T03.1.2` closed; `T03.1.3` closed 2026-08-27) | M-19, M-20 |
+| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1`–`T03.1.5` closed — `.5` closed 2026-09-06 on existing evidence; `T03.2.1` in progress) | M-19, M-20 |
 | **P4** | Problem Intelligence | ~12 | ⬜ | M-12, M-21, M-22, M-06 |
 | **P5** | Pattern Intelligence | ~14 | ⬜ | M-23, M-24, M-25, M-13 |
 | **P6** | Opportunity Intelligence | ~18 | ⬜ | C-01, M-14, M-26, M-27 |
@@ -95,10 +95,17 @@ impossible until the N-24 role is staffed and supplies assessments
 
 ---
 
-## P3 — Fact Extraction ⬜
+## P3 — Fact Extraction 🟡
 
 **Goal.** Convert Evidence into canonical, individually verifiable claims. The
 platform's integrity floor.
+
+**`T03.1.5` ✅ CLOSED 2026-09-06 on existing evidence** — F-V4
+assertion-vs-attributed-opinion classification: five enforcement layers
+(request → claim projection → Fact construction → acceptance rule →
+merge versioning) verified mechanically (`verify_t03_1_5.py` 42/42);
+classification is extractor-supplied and platform-enforced, never
+inferred; two findings surfaced in the spec, no production change.
 
 **`T03.1.1` ✅ CLOSED 2026-08-26** — `oip/extraction.py`; verifier 42/42;
 mutation 16/16. M-11 was already closed by R-5.
@@ -119,7 +126,7 @@ the four structure checks; merge policy reported, never executed
 (T03.1.4's boundary). M-19 stays open. `T03.1.4` (merging) ✅ **CLOSED
 2026-08-27** — EQUIVALENT extractions attach to the canonical Fact as a
 new version; UNCERTAIN/CONTAINMENT stay separate with DUPLICATES. Next:
-`T03.1.5` (claim-type classification); `T03.1.6` unblocked.
+~~`T03.1.5`~~ ✅ **CLOSED 2026-09-06** (above); `T03.1.6` unblocked.
 
 | Marker | Gap |
 |---|---|

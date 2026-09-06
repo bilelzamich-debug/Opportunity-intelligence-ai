@@ -1,0 +1,53 @@
+--- section A ---
+[PASS] ClaimType is exactly the two ratified members  (['ASSERTION', 'ATTRIBUTED_OPINION'])
+[PASS] claim_type=None refused at the request [F-V4]  (claim_type None is not a ClaimType [F-V4])
+[PASS] raw string 'ASSERTION' refused: the enum is not bypassable  (claim_type 'ASSERTION' is not a ClaimType [F-V4])
+[PASS] Fact.claim_type has NO default: the classification must be stated at construction (enum membership itself is guarded at the request and at acceptance -- see G-1b)  (default=<dataclasses._MISSING_TYPE object at 0x7f3c583ee010>)
+[PASS] the request signature carries claim_type as a named parameter
+--- section B ---
+[PASS] ASSERTION extraction: stored Fact carries claim_type=ASSERTION
+[PASS] ASSERTION: structured attribution not invented (None)
+[PASS] ATTRIBUTED_OPINION extraction: stored Fact carries the type
+[PASS] ATTRIBUTED_OPINION extraction: attributed_to travels verbatim
+[PASS] both Facts are ACTIVE (acceptance ran, nothing skipped past V)
+[PASS] the explanation names the classification (N-13 traceability)  (Extracted the claim from Evidence 'obj-eda51956-02cd-4787-9467-95a6bc153dae' at )
+--- section C ---
+[PASS] get_fact round-trip preserves claim_type
+[PASS] get_fact round-trip preserves attributed_to
+[PASS] the payload in the registry is a real Fact instance
+--- section D ---
+[PASS] L1 request construction refuses ATTRIBUTED_OPINION with missing attributed_to [F-V4]  (ATTRIBUTED_OPINION requires attributed_to [F-V4])
+[PASS] L1 request construction refuses ATTRIBUTED_OPINION with blank attributed_to [F-V4]  (ATTRIBUTED_OPINION requires attributed_to [F-V4])
+[PASS] L1 request construction refuses ATTRIBUTED_OPINION with whitespace attributed_to [F-V4]  (ATTRIBUTED_OPINION requires attributed_to [F-V4])
+[PASS] the bad requests were refused before extraction: refusal raised at construction, no N-10 extraction failure exists for them (nothing was attempted at the engine)  (extraction log length 0)
+[PASS] L3 Fact construction refuses ATTRIBUTED_OPINION without attributed_to (bypassing the request entirely)  (ATTRIBUTED_OPINION requires attributed_to [F-V4])
+[PASS] L3 refuses whitespace attribution: blank is not attributed  (ATTRIBUTED_OPINION requires attributed_to [F-V4])
+[PASS] no bad Fact object can exist to attempt a write with
+--- section E ---
+[PASS] rule PASSes the compliant ASSERTION fact  (ASSERTION)
+[PASS] rule PASSes the compliant ATTRIBUTED_OPINION fact  (ATTRIBUTED_OPINION)
+[PASS] rule SKIPs (never guesses a PASS) when no Fact payload is supplied  (no Fact payload supplied)
+[PASS] rule SKIPs non-Facts
+--- section F ---
+[PASS] first extraction is a v1 ATTRIBUTED_OPINION Fact
+[PASS] the EQUIVALENT extraction merged: v2, two attachments  (v=2 n=2)
+[PASS] merge preserved claim_type (classification cannot be laundered by corroboration)
+[PASS] merge preserved the canonical's attributed_to (F-I2 add-only covers the classification pair too)
+--- section G ---
+[PASS] replace() of attributed_to=None re-runs the constructor checks and refuses  (ATTRIBUTED_OPINION requires attributed_to [F-V4])
+[PASS] replace() of attributed_to=' ' re-runs the constructor checks and refuses  (ATTRIBUTED_OPINION requires attributed_to [F-V4])
+[PASS] claim_type=None is refused by the acceptance net (L4 FAIL), though the constructor pairing clause alone does not cover membership  (claim_type is not a known ClaimType)
+[PASS] claim_type='ASSERTION' is refused by the acceptance net (L4 FAIL), though the constructor pairing clause alone does not cover membership  (claim_type is not a known ClaimType)
+[PASS] a str-subclass 'claim_type' is refused (isinstance on the enum, not truthiness)
+[PASS] the merge produced one lineage, not two Facts
+[PASS] the merged object_id IS the new version (the write resolves)
+[PASS] hand-built ATTRIBUTED_OPINION Fact without attribution raises before any write is attempted
+--- section H ---
+[PASS] replay refusal fires on the replay reason; attribution on an ASSERTION request raises nothing on its own (no invented constraint)  (extraction refused for 'obj-f9733cc0-3969-4726-8fd9-d91704a685f9' at MERGE_FAILED (EVIDENCE_ALREADY_ATTACHED):)
+[PASS] an ASSERTION with attributed_to is accepted by the request constructor (F-V4 is one-directional as ratified)
+[PASS] the verifier only imports and exercises oip; the P1/P2 modules exist untouched by this task
+--- section I ---
+[PASS] an opinion-equivalent extraction merged into the ASSERTION canonical (S-3 ignores claim_type)  (v=2 type=ASSERTION)
+[PASS] the merge changed NO classification, raised no refusal, and the canonical Fact is exactly what the ratified policy produces -- documented as a finding in the specification, not patched here
+
+T03.1.5 verifier: 42/42 checks

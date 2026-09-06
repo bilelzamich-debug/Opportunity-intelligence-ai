@@ -7,6 +7,41 @@ Dates are the project's own recorded dates.
 
 ---
 
+## 2026-09-06 — `T03.1.5` closed on existing evidence (F-V4 classification)
+
+### Verified — nothing built, everything proven
+
+`T03.1.5` (assertion vs attributed-opinion classification) was found
+**already implemented** by `T03.1.1`'s pipeline work and closed on the
+T02.1.3 precedent (existing code + tests as evidence). The closure is
+mechanical, not remembered: `platform/validation/verify_t03_1_5.py`
+demonstrates both acceptance criteria across five enforcement layers —
+request construction, claim projection, Fact construction, the
+`fv4_claim_type_declared` acceptance rule, and merge versioning — with
+bypass attacks (raw strings, `None`, str-subclass smuggling,
+`replace()`-laundering) all refusing closedly. Verifier 42/42.
+**No production file changed; frozen modules byte-identical.**
+
+### Findings surfaced (recorded, not patched)
+
+- **Membership layering:** `Fact.claim_type` enum membership is enforced
+  at the request and at acceptance, not at the constructor — consistent
+  with N-08 (the acceptance path is the authority); the constructor
+  enforces the opinion-attribution pairing. Surfaced as a P5-class
+  hardening candidate for the Owner; `fact.py` is frozen P1.
+- **Canonical-level classification:** an `ATTRIBUTED_OPINION` extraction
+  judged EQUIVALENT to an existing `ASSERTION` canonical merges and keeps
+  the canonical's classification (S-3's four conditions exclude
+  `claim_type`). Demonstrated live in verifier section I. A
+  classification-disagreement policy would be a new decision record, not
+  a code edit.
+
+### Records
+
+`PROJECT_STATE.md`, `NEXT_STEPS.md`, `ROADMAP.md` §P3; spec + log in
+`platform/validation/T03.1.5-specification.md`,
+`platform/validation/T03.1.5-validation.log`.
+
 ## 2026-08-04 — Phase 2 Decision Set Ratified
 
 ### Added — 4 ratified decision records

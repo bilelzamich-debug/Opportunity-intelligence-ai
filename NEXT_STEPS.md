@@ -1,10 +1,13 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-08-27** — `T03.1.4` closed (canonical-claim merging,
-D-05); `T03.1.6` is now unblocked (its dependency `.4` is done).
-Prior state: 2026-08-27 (`T03.1.2`, `T03.1.3` closed), 2026-08-26
-(`T03.1.1` closed, P3 fact extraction opened);
+Current as of **2026-09-06** — `T03.1.5` closed on existing evidence
+(F-V4 classification; verifier 42/42; no production change). The S-3
+cluster awaits only `T03.1.6`; `T03.2.1` (critical-path ⚠) selected by
+dependency depth and in progress.
+Prior state: 2026-08-27 (`T03.1.4` closed, canonical-claim merging, D-05;
+`T03.1.6` unblocked), 2026-08-27 (`T03.1.2`, `T03.1.3` closed),
+2026-08-26 (`T03.1.1` closed, P3 fact extraction opened);
 2026-08-19 (D-1 resolved, `T02.1.3` closed, N-24 ratified);
 2026-08-04 (ratification of N-20…N-23).
 
@@ -19,8 +22,19 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T03.1.6` (needs `.4`, done),
-`T03.1.5` (depends only on `.1`).
+**What is executable now:** `T03.2.1` (deps `T03.1.3`+`T01.4.6` closed;
+⚠ critical path — selected over `T03.1.6` by dependency-depth analysis,
+since it gates `T03.2.2 → T03.2.3 → T03.3.1` where `.6` gates only the
+exit), `T03.1.6` (needs `.4`, done).
+~~`T03.1.5`~~ — ✅ **CLOSED 2026-09-06 ON EXISTING EVIDENCE**: F-V4 is
+enforced at five layers (request, claim projection, Fact construction,
+acceptance rule, merge versioning), demonstrated mechanically
+(`verify_t03_1_5.py` 42/42). Two findings recorded in the specification:
+enum membership is enforced at request+acceptance (constructor covers the
+pairing clause — the N-08 authority model, no persistence path affected);
+classification is canonical-level, so an EQUIVALENT merge keeps the
+canonical's claim_type — surfaced for the Owner, not patched (S-3 does
+not include claim_type in its four conditions).
 ~~`T03.1.4`~~ — ✅ **CLOSED 2026-08-27**: canonical-claim merging per D-05.
 `extract()` intercepts equivalence BEFORE any write, so an EQUIVALENT
 extraction attaches to the existing canonical Fact as a new version —
