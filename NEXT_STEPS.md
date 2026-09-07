@@ -1,9 +1,12 @@
 # Next Steps
 
 **What happens next, what blocks it, and who must act.**
-Current as of **2026-08-27** — `T03.1.4` closed (canonical-claim merging,
-D-05); `T03.1.6` is now unblocked (its dependency `.4` is done).
-Prior state: 2026-08-27 (`T03.1.2`, `T03.1.3` closed), 2026-08-26
+Current as of **2026-09-07** — `T03.2.2` closed (sampled deep audit for
+paraphrase drift; S-5 Layer 2; verifier 35/35, probes 16/16, mutation
+10/10). Executable now: `T03.2.3` (critical path, published rates),
+`T03.1.6` (contradiction detection), `T03.1.5` (claim-type classification).
+Prior state: 2026-08-27 (`T03.1.4` closed, canonical-claim merging, D-05;
+`T03.1.6` unblocked), 2026-08-27 (`T03.1.2`, `T03.1.3` closed), 2026-08-26
 (`T03.1.1` closed, P3 fact extraction opened);
 2026-08-19 (D-1 resolved, `T02.1.3` closed, N-24 ratified);
 2026-08-04 (ratification of N-20…N-23).
@@ -19,8 +22,17 @@ Both decisions required from the **Project Owner** are now taken:
 | **1** | Resolve **D-1** — amend `T02.2.4` AC2, or create a fourth human gate superseding N-2 | ✅ **RESOLVED 2026-08-19** — Option A / N-23 §5.5(i). AC2 now reads *"Targets recorded with their commissioning authority"*; N-2 unchanged; no fourth gate |
 | **2** | **Name the acquisition-rights authority** required by N-21 §5.1 | ✅ **RESOLVED 2026-08-19** — `N-24` **RATIFIED**: the role *Designated Source Rights/Compliance Authority*, scope narrowed to the N-21 §5.5 vocabulary, as audited. Acquisition still refuses everything until the role supplies assessments (`UNASSESSED`, fail-closed) |
 
-**What is executable now:** `T03.1.6` (needs `.4`, done),
-`T03.1.5` (depends only on `.1`).
+**What is executable now:** `T03.2.3` (needs `.2`, done),
+`T03.1.6` (needs `.4`, done), `T03.1.5` (depends only on `.1`).
+~~`T03.2.2`~~ — ✅ **CLOSED 2026-09-07**: sampled deep audit (`oip/audit.py`)
+per S-5 Layer 2. Sample rate configurable in `[0.0, 1.0]` (default 5%,
+0 disables); stratified by source type and extraction-confidence band;
+deterministic given seed. Deep audit compares the Fact against the source
+span and detects paraphrase drift Layer 1 misses (qualifier, quantity,
+negation, certainty, attribution, years, restrictors, closed lexicon).
+Unavailable/empty spans are UNAUDITABLE, never FAITHFUL [N-15].
+`covers_paraphrase_drift` on Layer 1 stays False; M-67 stays open.
+Verifier 35/35; probes 16/16; mutation 10/10; suite 3,654 unit.
 ~~`T03.1.4`~~ — ✅ **CLOSED 2026-08-27**: canonical-claim merging per D-05.
 `extract()` intercepts equivalence BEFORE any write, so an EQUIVALENT
 extraction attaches to the existing canonical Fact as a new version —

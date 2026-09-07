@@ -7,6 +7,40 @@ Dates are the project's own recorded dates.
 
 ---
 
+## 2026-09-07 — `T03.2.2` closed: sampled deep audit for paraphrase drift (S-5 Layer 2)
+
+### Implemented — Layer 2 is a real comparison, not a flipped flag
+
+`oip/audit.py` is the S-5 Layer-2 protocol: a configurable, deterministic,
+stratified sample of Facts is deep-audited against the **source span**
+(never a re-extraction). Judgements are the closed S-5 set
+`FAITHFUL` · `DRIFTED` · `UNSUPPORTED`. Incomplete audits are
+`UNAUDITABLE` (N-15/N-10) and are **not verified** — never silently
+FAITHFUL. `AnchorVerifier.covers_paraphrase_drift` stays `False`; M-67
+stays open. Layer 3 published rates are T03.2.3.
+
+The comparison is stronger than Layer 1: qualifier support, quantity,
+negation polarity, certainty, attribution, temporal markers, dropped
+restrictors, and a closed conflict lexicon. The recorded Layer-1 gap
+(`sellers`/`report` locatable in "some sellers occasionally report
+issues") PASSES Layer 1 and is DRIFTED here.
+
+### Evidence
+
+Suite 3,654 unit (128 stress deselected), 0 failing. `verify_t03_2_2.py`
+35/35; `probe_t03_2_2.py` 16/16; `mutate_t03_2_2.py` 10/10 killed, zero
+survivors (first run: two real finds — a dead zero-rate guard proven
+equivalent and a lexicon path not uniquely tested; both fixed, not
+excused). Frozen modules byte-identical.
+
+### Not done
+
+T03.2.3 published rates. T03.1.6 contradictions. Recreating T03.2.1's
+`install_anchor_verification` (verified at `e5b4b08` on a predecessor
+session; this clone's HEAD was `01906a5`). Closing M-67.
+
+---
+
 ## 2026-08-04 — Phase 2 Decision Set Ratified
 
 ### Added — 4 ratified decision records

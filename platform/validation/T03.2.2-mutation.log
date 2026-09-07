@@ -1,0 +1,14 @@
+baseline (unmutated) ... pass
+  killed    M1 invalid rates accepted (boundary skipped)
+  killed    M2 zero rate returns the whole stratum
+  killed    M3 sample size not capped at n
+  killed    M4 None span treated as FAITHFUL
+  killed    M5 empty span treated as auditable
+  killed    M6 lexicon conflicts ignored
+  killed    M7 negation mismatch ignored
+  killed    M8 quantity mismatch ignored
+  killed    M9 qualifier tokens not required to be supported
+  killed    M10 completed FAITHFUL assigned on UNAUDITABLE path (judgement smuggled)
+
+killed 10/10; survivors 0; inapplicable 0
+sources restored byte-identical: True

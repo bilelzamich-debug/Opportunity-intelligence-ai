@@ -1,0 +1,18 @@
+[PASS] P1 wording-preserving-anchors still drifts (all/some)
+[PASS] P2 quantity 10→50 is DRIFTED while Layer 1 locates subject/predicate
+[PASS] P3 year 2019→2024 is DRIFTED
+[PASS] P4 entity Beta→Gamma in qualifier is DRIFTED
+[PASS] P5 dropped negation is DRIFTED
+[PASS] P6 attribution Jane→John is DRIFTED
+[PASS] P7 may→will is DRIFTED
+[PASS] P8 increased vs decreased qualifier is DRIFTED
+[PASS] P9 dropped 'only' restrictor is DRIFTED
+[PASS] P10 unavailable evidence is UNAUDITABLE, not verified
+[PASS] P11 empty content is UNAUDITABLE
+[PASS] P12 AnchorVerifier.covers_paraphrase_drift remains False
+[PASS] P13 rate=5 (percent-shaped) is refused, not coerced to 0.05
+[PASS] P14 NaN sample_rate refused
+[PASS] P15 bool True is not a valid rate
+[PASS] P16 duplicate candidates sampled once
+
+T03.2.2 probes: 16/16

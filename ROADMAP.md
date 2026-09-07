@@ -12,7 +12,7 @@ begins. Phase boundaries come from PKP v1 §9; blocking markers from PKP v2 §14
 | **P0** | Specification | 37 decisions | ✅ **CLOSED** | — |
 | **P1** | Foundation | 44 | ✅ **CLOSED** 2026-08-04 | — |
 | **P2** | Research Engine | 10 | ✅ **CLOSED 2026-08-26** | — |
-| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1`/`T03.1.2` closed; `T03.1.3` closed 2026-08-27) | M-19, M-20 |
+| **P3** | Fact Extraction | ~15 | 🟡 **In progress** (`T03.1.1`–`.4` closed; `T03.2.2` closed 2026-09-07) | M-19, M-20 |
 | **P4** | Problem Intelligence | ~12 | ⬜ | M-12, M-21, M-22, M-06 |
 | **P5** | Pattern Intelligence | ~14 | ⬜ | M-23, M-24, M-25, M-13 |
 | **P6** | Opportunity Intelligence | ~18 | ⬜ | C-01, M-14, M-26, M-27 |
@@ -118,8 +118,10 @@ recorded DECOMPOSITION_FAILED refusals; every verdict recomputable from
 the four structure checks; merge policy reported, never executed
 (T03.1.4's boundary). M-19 stays open. `T03.1.4` (merging) ✅ **CLOSED
 2026-08-27** — EQUIVALENT extractions attach to the canonical Fact as a
-new version; UNCERTAIN/CONTAINMENT stay separate with DUPLICATES. Next:
-`T03.1.5` (claim-type classification); `T03.1.6` unblocked.
+new version; UNCERTAIN/CONTAINMENT stay separate with DUPLICATES.
+**`T03.2.2` ✅ CLOSED 2026-09-07** — sampled deep audit (`oip/audit.py`);
+Layer 2 detects paraphrase drift Layer 1 misses; sample rate configurable;
+M-67 stays open. Next: `T03.2.3` (published rates); `T03.1.5`; `T03.1.6`.
 
 | Marker | Gap |
 |---|---|

@@ -1,0 +1,45 @@
+--- section A ---
+[PASS] S-5 initial sample rate is 0.05
+[PASS] default config uses the S-5 initial rate
+[PASS] rate 0.0 is valid (disabled)
+[PASS] rate 1.0 is valid (audit all)
+[PASS] invalid rates refused at construction
+[PASS] replay under the same seed is identical
+[PASS] 5% of 20 in one stratum is exactly 1
+[PASS] rate 0 yields an empty sample
+[PASS] rate 1 yields every unique candidate
+--- section B ---
+[PASS] canonical paraphrase-drift case: Layer 1 would PASS
+[PASS] canonical paraphrase-drift case: Layer 2 is DRIFTED
+[PASS] acceptable paraphrase (10 percent / FY2024) is FAITHFUL
+--- section C ---
+[PASS] None span is UNAUDITABLE and not verified [N-15]
+[PASS] whitespace span is UNAUDITABLE
+[PASS] absent subject/predicate is UNSUPPORTED (not FAITHFUL)
+--- section D ---
+[PASS] record names the Fact, evidence, locator, span, config, result, reason, time
+[PASS] register is outside the object model [N-10]
+--- section E ---
+[PASS] AnchorVerifier.covers_paraphrase_drift is still False
+[PASS] Layer 1 PASS text still disclaims paraphrase drift
+--- section F ---
+[PASS] empty candidate set → empty sample
+[PASS] duplicates do not inflate the sample
+[PASS] requested 100% of 3 yields 3 (never more)
+[PASS] disabled sampling writes no records and verifies nothing
+--- section G ---
+[PASS] quantity/year/negation/certainty/relationship drifts detected
+[PASS] attribution rewrite is DRIFTED
+[PASS] dropped restrictor is DRIFTED
+--- section H ---
+[PASS] audit.py stays within the <=6 oip-import boundary
+[PASS] audit.py does not import anchoring (DAG: compose via SpanOf)
+[PASS] audit.py does not import store (no new integration point)
+[PASS] module graph remains a DAG with audit included
+[PASS] no non-store module exceeds the 6-import boundary
+[PASS] semantic.py still sets covers_paraphrase_drift default False
+[PASS] M-67 remains OPEN
+[PASS] backlog T03.2.2 ACs unchanged [F5]
+[PASS] S-5 Layer-2 judgement vocabulary unchanged
+
+T03.2.2 verifier: 35/35 checks
