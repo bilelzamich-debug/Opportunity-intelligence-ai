@@ -143,6 +143,46 @@ inferred: merged attachments start UNASSESSED and the count does not
 move [N-16]. The interim T03.1.1 "never merges" boundary is superseded
 by this task, with the affected pins re-semantified under provenance.
 
+CLAIM-TYPE CLASSIFICATION (T03.1.5)
+------------------------------------
+F-V4: every Fact carries a claim_type from the closed two-member
+taxonomy (ASSERTION / ATTRIBUTED_OPINION), and an ATTRIBUTED_OPINION
+carries a non-empty attributed_to. The request contract is unchanged:
+the caller still states claim_type, request validation still requires
+it to be a ClaimType with attribution for ATTRIBUTED_OPINION, and the
+store's F-V4 rule remains the final structural safety net. What
+T03.1.5 adds is the CLASSIFICATION capability AT THE EXTRACTION
+BOUNDARY: classify_claim_type() derives the classification
+deterministically from the one piece of information the contract
+carries about attribution -- attributed_to, the named/identified
+originator (source, person, organization, publication or other
+identifiable originator) the proposition is explicitly attributed to:
+
+- a non-empty attributed_to IS an actual attributable origin: the
+  claim is an ATTRIBUTED_OPINION;
+- no attributed_to means no attributable origin exists: the claim
+  stands as an ASSERTION of the stated proposition.
+
+Explicit attribution is the ONLY signal. Uncertainty, hedging, low
+extraction confidence, controversiality, the source being a vendor or
+a publication, and attribution-suggesting wording ("believes", "may",
+"likely") never enter the classification -- attribution requires an
+actual origin the contract can name, and none is ever guessed from
+text. No heuristics, no model, no network: the same input always
+yields the same member of the closed taxonomy.
+
+extract() holds the caller's stated claim_type to the derived
+classification. A request that states ASSERTION while naming an
+originator is internally contradictory: honouring it as stated would
+silently DROP the attribution at Fact construction, and silently
+flipping the type would be silent defaulting. The extraction is
+refused with a recorded INVALID_REQUEST / CLAIM_TYPE_CONFLICT failure
+(N-10: never silent), and the caller restates the request
+consistently. The mirror case -- ATTRIBUTED_OPINION without
+attribution -- remains unconstructable at request validation, so the
+classification and the stated type can only disagree in that one
+direction.
+
 WHAT IS IMPLEMENTED (the three T03.1.1 acceptance criteria)
 ------------------------------------------------------------
 - AC1  Claims interpretable without reading the Evidence: one request per
@@ -162,8 +202,7 @@ WHAT IS DELIBERATELY NOT IMPLEMENTED
 - T03.1.2 (decomposition as a capability), T03.1.3 (positional anchoring
   machinery -- the anchor here is the verbatim source span, the only
   locator mechanically resolvable today), T03.1.4 (merging / DUPLICATES
-  recording), T03.1.5 (claim-type classification: the caller states it,
-  F-V4 requires it at construction), T03.2.1-3 (Layer 1 at acceptance for
+  recording), T03.2.1-3 (Layer 1 at acceptance for
   all Facts, sampled audit, published rates).
 - No new semantics: no rights judgement, no independence inference, no
   density gate, no coverage effect.
@@ -564,6 +603,13 @@ class ExtractionRequest:
     never defaulted: the S-3 components, the qualifying context (AC2),
     the verbatim source span (the anchor), the claim type (F-V4), and
     the extractor's own certainty (R-3).
+
+    [T03.1.5] The stated claim_type must AGREE with the engine's
+    classification: classify_claim_type() derives the type from this
+    request's attributed_to (an actual attributable origin names an
+    ATTRIBUTED_OPINION; no origin, an ASSERTION), and extract() refuses
+    a stated type that contradicts it rather than resolving the
+    contradiction silently.
     """
 
     evidence_ref: str
@@ -612,6 +658,20 @@ class ExtractionRequest:
             raise ExtractionError(
                 f"claim_type {self.claim_type!r} is not a ClaimType [F-V4]"
             )
+        # F-V4 / T03.1.5: attributed_to names the identifiable originator
+        # an ATTRIBUTED_OPINION is attributed to. The classification
+        # (classify_claim_type) now consumes it on EVERY path, so its
+        # type is validated here exactly like every other field the
+        # engine consumes (claim_type, extraction_confidence): a
+        # non-string originator is out of the declared contract and
+        # refuses at construction, never crashes the classifier.
+        if self.attributed_to is not None and not isinstance(
+            self.attributed_to, str
+        ):
+            raise ExtractionError(
+                f"attributed_to must be a string naming the identifiable "
+                f"originator, or None; got {self.attributed_to!r} [F-V4]"
+            )
         if self.claim_type is ClaimType.ATTRIBUTED_OPINION:
             if not (self.attributed_to or "").strip():
                 raise ExtractionError(
@@ -656,6 +716,54 @@ class ExtractionRequest:
             qualifier=self.qualifier,
             value=self.value,
         )
+
+
+# ---------------------------------------------------------------------------
+# Claim-type classification  [T03.1.5, F-V4]
+# ---------------------------------------------------------------------------
+
+
+def classify_claim_type(attributed_to: str | None) -> ClaimType:
+    """Classify a claim as ASSERTION or ATTRIBUTED_OPINION. [F-V4, T03.1.5]
+
+    The distinction is EXPLICIT ATTRIBUTION, and nothing else. An
+    ATTRIBUTED_OPINION is a claim whose proposition is explicitly
+    attributed to a named/identified source, person, organization,
+    publication or other identifiable originator; an ASSERTION is a
+    claim represented as an assertion of the stated proposition.
+
+    Deterministic, reproducible and total over its declared domain. The
+    extraction request contract carries exactly one field that names an
+    attributable origin -- attributed_to -- so its presence or absence
+    IS the classification:
+
+    - a non-empty attributed_to (after strip, the F-V4 non-emptiness
+      convention) is an actual attributable origin: the claim is an
+      ATTRIBUTED_OPINION;
+    - no attributed_to means no attributable origin exists: the claim
+      stands as an ASSERTION.
+
+    Nothing else enters the classification, by design. Uncertainty,
+    hedging, low extraction confidence, controversiality, the source
+    being a vendor or a publication, and attribution-suggesting wording
+    ("believes", "may", "likely") are NOT attribution: an opinion
+    requires an actual origin the contract can name, and this function
+    never guesses one from text. No heuristics, no model, no network --
+    the same input always yields the same member of the closed
+    two-value taxonomy. [T03.1.5 design constraint]
+    """
+    if attributed_to is not None and not isinstance(attributed_to, str):
+        # Out of the declared str | None domain. The request validates
+        # this before the engine runs; the branch keeps the public
+        # capability loud rather than crashing on .strip() when called
+        # directly.
+        raise ExtractionError(
+            f"attributed_to must be a string naming the identifiable "
+            f"originator, or None; got {attributed_to!r} [F-V4]"
+        )
+    if (attributed_to or "").strip():
+        return ClaimType.ATTRIBUTED_OPINION
+    return ClaimType.ASSERTION
 
 
 # ---------------------------------------------------------------------------
@@ -844,7 +952,9 @@ def extract(
     """Extract one self-contained claim from one Evidence object. [AC1]
 
     Fail-closed throughout: a Fact exists only after every gate passed --
-    request validity, Evidence resolution and ACTIVE status, in-place
+    request validity (including the T03.1.5 claim-type classification,
+    which holds the stated claim_type to the attribution the request
+    carries), Evidence resolution and ACTIVE status, in-place
     verifiability (N-15), temporal consistency (V8), non-empty content,
     unique verbatim anchor, S-5 layer-1 component presence, the
     positional anchor round-trip (T03.1.3), and the store's own
@@ -864,6 +974,37 @@ def extract(
             request, "unknown: malformed request",
             ExtractionStage.INVALID_REQUEST, "NOT_A_REQUEST",
             f"expected an ExtractionRequest, got {request!r}", log, now,
+        )
+        raise _refuse(failure)
+
+    # -- T03.1.5: classify the claim AT THE EXTRACTION BOUNDARY. [F-V4]
+    # The engine derives the classification deterministically from the
+    # attribution the request carries (classify_claim_type: a named
+    # originator is an actual attributable origin and classifies the
+    # claim ATTRIBUTED_OPINION; no originator, an ASSERTION) and holds
+    # the caller's stated claim_type to it. Request validation already
+    # makes the opposite direction unconstructable (an
+    # ATTRIBUTED_OPINION without attribution cannot be built), so a
+    # disagreement can only be a request that states ASSERTION while
+    # naming an originator. Honouring such a request as stated would
+    # silently DROP the attribution at Fact construction; flipping the
+    # type would be silent defaulting. Both are refused: the failure is
+    # recorded (N-10) and the caller restates the request consistently.
+    # This is the classification stage of the extraction pipeline --
+    # before decomposition, Fact construction and store acceptance, and
+    # before the store's F-V4 rule re-checks the Fact structurally.
+    derived_claim_type = classify_claim_type(request.attributed_to)
+    if derived_claim_type is not request.claim_type:
+        failure = _failure(
+            request, request.evidence_ref,
+            ExtractionStage.INVALID_REQUEST, "CLAIM_TYPE_CONFLICT",
+            f"the stated claim_type {request.claim_type.value} contradicts "
+            f"the request's own attribution information "
+            f"(attributed_to={request.attributed_to!r}), which classifies "
+            f"the claim as {derived_claim_type.value}; the attribution is "
+            f"never silently dropped and the claim type is never silently "
+            f"flipped -- restate the request consistently [F-V4, T03.1.5]",
+            log, now,
         )
         raise _refuse(failure)
 

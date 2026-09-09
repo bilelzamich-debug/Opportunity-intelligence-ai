@@ -1170,6 +1170,12 @@ class TestValidationBranches:
              "attributed_to": None},
             {"claim_type": ClaimType.ATTRIBUTED_OPINION,
              "attributed_to": "  "},
+            # T03.1.5: attributed_to names an identifiable originator, so
+            # its type is validated like every consumed field -- a
+            # non-string originator is out of the declared contract.
+            {"claim_type": ClaimType.ASSERTION, "attributed_to": 42},
+            {"claim_type": ClaimType.ATTRIBUTED_OPINION,
+             "attributed_to": 42},
             {"extraction_confidence": True},
             {"extraction_confidence": "0.5"},
             {"extraction_confidence": -0.1},
@@ -1284,3 +1290,96 @@ class TestValidationBranches:
         assert report.total_claims == 2
         ratio = report.density_spread_ratio
         assert ratio is not None and ratio >= 1.0
+
+
+# ---------------------------------------------------------------------------
+# T03.1.5 -- claim-type classification at the extraction boundary  [F-V4]
+# ---------------------------------------------------------------------------
+
+
+class TestClaimTypeClassification:
+    """The engine classifies (classify_claim_type: a named originator is
+    an actual attributable origin -> ATTRIBUTED_OPINION; none ->
+    ASSERTION) and holds the stated claim_type to it. Consistent requests
+    of both types extract exactly as before; a contradictory request is
+    refused and recorded, never resolved silently."""
+
+    def test_stated_type_must_agree_with_derived_classification(self):
+        rig, ref = changelog_rig()
+        with pytest.raises(ExtractionRefusedError):
+            extract(
+                rig.extraction(
+                    evidence_ref=ref,
+                    claim_type=ClaimType.ASSERTION,
+                    attributed_to="the vendor's changelog",
+                ),
+                store=rig.store, log=rig.log, clock=lambda: TICK,
+            )
+        failure = rig.log.for_evidence(ref)[-1]
+        assert failure.stage is ExtractionStage.INVALID_REQUEST
+        assert failure.reason == "CLAIM_TYPE_CONFLICT"
+        assert not failure.attempted  # request validity, N-10
+        assert rig.store.objects_of_type(_fact_type()) == ()
+
+    def test_consistent_requests_of_both_types_extract_unchanged(self):
+        """Regression: with classification integrated, both consistent
+        classifications still extract through the full flow -- distinct
+        claims, so each creates its own Fact (no merge interplay)."""
+        rig = vendor_rig("src-a", "src-b")
+        ra = rig.acquire("src-a", VENDOR,
+                         "Changelog: bulk edits silently fail above 50 SKUs.")
+        rb = rig.acquire("src-b", VENDOR,
+                         "Forum: the export tool truncates files above "
+                         "10 MB.")
+        assertion = extract(
+            rig.extraction(evidence_ref=ra),
+            store=rig.store, log=rig.log, clock=lambda: TICK,
+        )
+        assert assertion.fact.claim_type is ClaimType.ASSERTION
+        assert assertion.fact.attributed_to is None
+        opinion = extract(
+            rig.extraction(
+                evidence_ref=rb,
+                subject="the export tool",
+                predicate="truncates files above",
+                anchor="the export tool truncates files above 10 MB",
+                qualifying_context="as reported on the seller forum",
+                claim_type=ClaimType.ATTRIBUTED_OPINION,
+                attributed_to="a forum post by seller-88",
+            ),
+            store=rig.store, log=rig.log,
+            clock=lambda: TICK + timedelta(seconds=1),
+        )
+        assert opinion.fact.claim_type is ClaimType.ATTRIBUTED_OPINION
+        assert opinion.fact.attributed_to == "a forum post by seller-88"
+        assert len(rig.store.objects_of_type(_fact_type())) == 2
+        assert len(rig.log) == 0  # nothing refused along the way
+
+    def test_classification_preserves_failure_recording_conventions(self):
+        """Regression: the new refusal is recorded through the same N-10
+        machinery as every other refusal; pre-existing refusal stages
+        are untouched by the classification gate."""
+        rig, ref = changelog_rig()
+        # The classification conflict itself: one recorded failure with
+        # its stage, reason and configuration provenance.
+        with pytest.raises(ExtractionRefusedError):
+            extract(
+                rig.extraction(
+                    evidence_ref=ref,
+                    claim_type=ClaimType.ASSERTION,
+                    attributed_to="the vendor's changelog",
+                ),
+                store=rig.store, log=rig.log, clock=lambda: TICK,
+            )
+        failure = rig.log.for_evidence(ref)[-1]
+        assert failure.engine_configuration_ref == "fact-extraction-v1"
+        assert failure.engine.value == "FactExtraction"
+        # An existing refusal path still records its own stage.
+        with pytest.raises(ExtractionRefusedError):
+            extract(
+                rig.extraction(evidence_ref=ref, anchor="absent span"),
+                store=rig.store, log=rig.log, clock=lambda: TICK,
+            )
+        anchor_failure = rig.log.for_evidence(ref)[-1]
+        assert anchor_failure.stage is ExtractionStage.ANCHOR_NOT_FOUND
+        assert anchor_failure.attempted
