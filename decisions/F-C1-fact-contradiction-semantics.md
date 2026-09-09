@@ -1,0 +1,1 @@
+../docs/decisions/F-C1-fact-contradiction-semantics.md

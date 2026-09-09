@@ -1,21 +1,23 @@
 # F-C1 — Fact Contradiction: Detection and Representation Semantics
 
-> **DRAFT — NOT RATIFIED.** This record is a decision *proposal* for
-> T03.1.6. None of its answers is binding. Per the decision-register
-> amendment procedure (§7.1) it is raised as a new record in `DRAFT`,
-> superseding nothing and modifying no `RATIFIED` record. T03.1.6 remains
-> **blocked from implementation** until this record (or an amended
-> descendant) is ratified by the Project Owner. The ratification act and
-> its annotation requirements are stated in §Ratification below.
+> **RATIFIED 2026-09-09.** The annotation-layer entry recording this
+> ratification and its binding interpretation is
+> `RATIFICATION-ANNOTATIONS.md` §13, mapping this record to IOM §1.2
+> (the `contradicts` attribute), IOM §3.2 (Fact: the CONTRADICTS row,
+> Engine Authority, both-Facts-ACTIVE), S-3 (disjoint interaction, not
+> superseded) and backlog `T03.1.6`. Ratified with the Project Owner's
+> required Q7 amendment (narrower binding scope; see R7). Frozen
+> documents are not rewritten; the annotation layer records the binding
+> interpretation.
 
 | Field | Value |
 |---|---|
 | **ID** | F-C1 |
 | **Title** | Fact Contradiction: Detection and Representation Semantics |
-| **Status** | `DRAFT` — **NOT RATIFIED** |
+| **Status** | `RATIFIED` |
 | **Owner** | Platform Architecture |
 | **Date recorded** | 2026-09-09 |
-| **Date decided** | — (pending ratification) |
+| **Date decided** | 2026-09-09 |
 | **Source** | Backlog `T03.1.6`; IOM §1.2 (`contradicts`), §3.2 (Fact: CONTRADICTS row, Engine Authority, Failure Cases), §2.4/D-06; R-06; S-3; F-V4; N-4; N-6; N-10; R-1; R-2; V12; T03.1.4 specification; T03.1.6 read-only inspection |
 | **Closes** | — (the T03.1.6 specification gap: no ratified source defines when two claims are *incompatible*. OQ-03 is already closed for the *representation* question by R-06; this record addresses the *detection* rule OQ-03 never covered) |
 | **Backlog task** | `T03.1.6` |
@@ -198,12 +200,19 @@ unaffected — refusals remain request-validity failures).
 
 ### R7 — Graph projection (answers Q7)
 
-`UniversalAttributes.contradicts` is the **authoritative and sole
-recording surface for T03.1.6**. No graph `Relationship` objects are
-emitted by this task.
+**UniversalAttributes.contradicts is the authoritative recording surface
+for T03.1.6. Graph projection of CONTRADICTS is OUT OF SCOPE for
+T03.1.6. T03.1.6 MUST NOT add graph edges or modify graph/store
+infrastructure. Any future graph projection decision remains a separate
+architectural decision and must not be inferred from this task.**
 
-This was verified against R-06 and the graph contracts, not assumed from
-the DUPLICATES precedent:
+This is a binding scope statement about T03.1.6 — not an architectural
+claim about the entire system, and not a declaration that graph
+projection is permanently forbidden. A future architectural decision may
+separately determine whether CONTRADICTS (and DUPLICATES) peer-link
+attributes should become Knowledge Graph edges. The scope was reached by
+verifying against R-06 and the graph contracts, not by assuming the
+DUPLICATES precedent:
 
 - N-6: objects are authoritative for their relationships; the graph is a
   derived, rebuildable index that **may lag** and "may never contradict"
@@ -213,21 +222,18 @@ the DUPLICATES precedent:
   not obligate edge emission. The store's atomic write path (`_commit`)
   indexes **lineage only** — this is the existing, ratified state for
   DUPLICATES as well.
-- The Master Reference §1014 does anticipate the graph holding
+- The Master Reference §1014 anticipates the graph holding
   "contradiction links (if OPEN QUESTION-03 is resolved affirmatively)".
-  That anticipation is **not silently dropped**: projecting peer-link
-  attributes (DUPLICATES and CONTRADICTS uniformly) into graph edges is
-  recorded in Known Tensions as a deferred index concern. It cannot be
-  part of T03.1.6: it requires modifying `store.py`/`graph.py` (frozen
-  scope) or a seventh oip import in `extraction.py` (breaking the
-  ratified 6-import budget). Under N-6 the authoritative relationship
-  already exists on the object; the graph merely lacks the projection,
-  exactly as it does today for DUPLICATES.
+  That anticipation is **preserved as a future architectural issue**
+  (Known Tensions 1), not silently dropped and not decided here. It is
+  out of scope for T03.1.6 because it would require modifying
+  `store.py`/`graph.py` (frozen scope for this task) or a seventh oip
+  import in `extraction.py` (breaking the ratified 6-import budget).
 
 The backlog AC "Incompatible claims linked, not silently resolved" is
-satisfied by the attribute link (V12's authoritative reading of the
-object-asserted relationship surface; the identical pattern T03.1.4's
-ratified closure accepted for DUPLICATES).
+satisfied by the attribute link (V12's reading of the object-asserted
+relationship surface; the identical pattern T03.1.4's ratified closure
+accepted for DUPLICATES).
 
 ### R8 — Invariants
 
@@ -391,16 +397,18 @@ record, frozen document, or platform/oip file.
   model does not define.
 
 **Q7 — graph projection.**
-- **Option A — attributes only, projection deferred and recorded
-  (selected, R7).**
+- **Option A — attribute recording only for T03.1.6; graph projection
+  out of scope and reserved to a separate future architectural decision
+  (selected, R7; scope narrowed at ratification by the Project Owner's
+  required amendment).**
 - **Option B — also emit graph Relationship objects now.** *Rejected for
   this task:* not required by any decision record (MR §1014 is
   anticipatory and the lowest-precedence document; N-6 explicitly
   permits the index to lag); not implementable within T03.1.6's file and
   import constraints (store.py/graph.py frozen; `oip.relationships`
   would be a seventh import); and projecting CONTRADICTS but not
-  DUPLICATES would be arbitrary. Recorded in Known Tensions instead —
-  the ratifier may of course amend this answer at ratification.
+  DUPLICATES would be arbitrary. The ratification amendment confirmed
+  and narrowed this scope (R7).
 
 ## Rationale
 
@@ -533,8 +541,9 @@ remains available to any future projection, whose edges would cite
 
 ## Implementation Constraints
 
-*(For the T03.1.6 execution specification. This record authorises no
-implementation — T03.1.6 stays blocked until ratification.)*
+*(For the T03.1.6 execution specification. Ratified 2026-09-09; the
+ratification act itself changes no code and creates no tests — see
+§Ratification.)*
 
 1. Sole modified file: `platform/oip/extraction.py`; new tests in
    `platform/tests/test_contradiction.py` (created at implementation
@@ -568,7 +577,9 @@ implementation — T03.1.6 stays blocked until ratification.)*
 - Subject/predicate/qualifier resolution (paraphrase, synonyms).
 - Unit conversion or any physical-quantity knowledge.
 - Retroactive scanning or migration of pre-existing Fact pairs.
-- Graph edge projection (deferred, recorded as a tension).
+- Graph edge projection (out of scope for T03.1.6; any future projection
+  is a separate architectural decision that must not be inferred from
+  this task — R7).
 - S-2 `contradiction_count` wiring and any support-function change.
 - Any resolution, arbitration, winner-selection, decay or confidence
   effect of contradiction (S-2 P5 is a *downstream consumer* of links,
@@ -601,13 +612,15 @@ implementation — T03.1.6 stays blocked until ratification.)*
 
 ## Known Tensions
 
-1. **MR §1014 vs deferred graph projection (Q7).** The Master Reference
-   anticipates graph-held contradiction links; no projection of
-   peer-link attributes (DUPLICATES or CONTRADICTS) exists, and building
-   one is outside T03.1.6's frozen scope. Under N-6 this is a lagging
-   index, not a correctness gap, but it is a *recorded* divergence, not
-   a silent one. A future task should project both attribute kinds
-   uniformly at rebuild.
+1. **MR §1014 vs graph projection — a future architectural issue (Q7).**
+   The Master Reference anticipates graph-held contradiction links; no
+   projection of peer-link attributes (DUPLICATES or CONTRADICTS) exists,
+   and building one is outside T03.1.6's frozen scope. Whether, how and
+   when peer-link attributes should be projected into graph edges is
+   deliberately left to a **separate architectural decision**: this
+   record neither makes that decision nor forbids it (R7). Under N-6 the
+   absence of a projection is a lagging index, not a correctness gap —
+   but it is a *recorded* divergence, not a silent one.
 2. **With T03.1.4-F1 (open).** If merging becomes type-aware, the
    cross-type EQUIVALENT pairs F1 would separate into DUPLICATES-linked
    Facts currently merge and never reach contradiction detection. F1's
@@ -632,19 +645,31 @@ implementation — T03.1.6 stays blocked until ratification.)*
 
 ## Ratification
 
-**This record is NOT RATIFIED and binds nothing.** T03.1.6 remains
-blocked from implementation until ratification. The ratification step,
-mirroring F-V4's mechanism exactly:
+**RATIFIED 2026-09-09.** The Project Owner accepted the semantic
+analysis with one required amendment, applied before ratification and
+affecting Q7 only:
 
-1. The Project Owner reviews and (if desired) amends any Q1–Q7 answer —
-   amendment before ratification is by editing this DRAFT (it is not yet
-   immutable); amendment after ratification is by superseding record.
-2. On agreement: set **Status** to `RATIFIED` and **Date decided**; add
-   an annotation section to `RATIFICATION-ANNOTATIONS.md` mapping F-C1
-   to IOM §1.2 (`contradicts`), IOM §3.2 (CONTRADICTS row, Engine
-   Authority, both-Facts-ACTIVE), S-3 (disjoint interaction, not
-   superseded), and backlog `T03.1.6`. No frozen document is rewritten;
-   the record and annotation are committed together, as `2dcd03e` did
-   for F-V4.
-3. Only then is T03.1.6 specification-complete for implementation
-   planning (execution specification → implementation → verification).
+- **Q7 amendment (owner-required, applied verbatim in R7):**
+  "UniversalAttributes.contradicts is the authoritative recording
+  surface for T03.1.6. Graph projection of CONTRADICTS is OUT OF SCOPE
+  for T03.1.6. T03.1.6 MUST NOT add graph edges or modify graph/store
+  infrastructure. Any future graph projection decision remains a
+  separate architectural decision and must not be inferred from this
+  task." The Master Reference §1014 tension is preserved as a future
+  architectural issue (Known Tensions 1). The amendment is a scope
+  statement for T03.1.6, not a permanent prohibition on graph
+  projection.
+
+Q1–Q6 were approved as proposed, unchanged. The record was re-read in
+full after the amendment to confirm that no other semantics changed.
+
+The ratification act followed the F-V4 mechanism (`2dcd03e`) exactly:
+Status set to `RATIFIED`, Date decided set, and the annotation-layer
+entry added at `RATIFICATION-ANNOTATIONS.md` §13, mapping this record to
+IOM §1.2 (`contradicts`), IOM §3.2 (CONTRADICTS row, Engine Authority,
+both-Facts-ACTIVE), S-3 (disjoint interaction, not superseded) and
+backlog `T03.1.6`. No frozen document was rewritten.
+
+Ratification changes no code and creates no tests. T03.1.6 now proceeds
+to its execution specification and implementation under the normal task
+process; T03.1.4-F1 remains unratified and not required.
