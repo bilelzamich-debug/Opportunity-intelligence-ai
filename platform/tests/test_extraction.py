@@ -30,6 +30,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from oip.acquisition import AcquisitionLog, AcquisitionRequest, acquire
+from oip.anchoring import install_anchor_verification
 from oip.claim import Quantity, Verdict
 from oip.configuration import FailureStore
 from oip.coverage import OutOfFrameRegister
@@ -72,6 +73,11 @@ class Rig:
         targets = targets or {}
         self.registry = SourceRegistry()
         self.store = KnowledgeStore()
+        # T03.2.1: this composition root installs S-5 Layer 1 anchor
+        # verification, so every Fact written through the Rig is
+        # F-V6-verified at acceptance (SKIP -> PASS/FAIL). The default
+        # store stays unconfigured [I-1]. [S-5, F-V6, N-8]
+        self.anchor_verifier = install_anchor_verification(self.store)
         self.out_of_frame = OutOfFrameRegister()
         self.refusals = RefusalRegister()
         self.acq_log = AcquisitionLog()
