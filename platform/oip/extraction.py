@@ -54,6 +54,18 @@ Architecture References:
          create authority this module exercises and nothing else.
 - M-11   Closed by R-5: identity and deduplication live in the Fact
          registry and the S-3 equivalence test, not here.
+- F-C1   Fact contradiction semantics (RATIFIED 2026-09-09, T03.1.6):
+         an ESTABLISHED CONTRADICTION exists iff same subject, same
+         predicate, IDENTICAL qualifier, both values quantified, same
+         unit, and the values disagree outside the coarser stated
+         precision. Contradiction is linked (the contradicts attribute),
+         never resolved: no winner, no merge interference, both Facts
+         remain ACTIVE. Fail-closed: "cannot establish contradiction"
+         never links. Type-blind: claim_type/attributed_to are never
+         consulted (F-V4 preserved).
+- R-06   CONTRADICTS is a member of the closed ten-type taxonomy and
+         resolves OQ-03 toward representing disagreement rather than
+         selecting a winner; V12 validates the attribute surface.
 
 POSITIONAL ANCHORING (T03.1.3)
 -------------------------------
@@ -905,6 +917,47 @@ def _refuse(failure: ExtractionFailure) -> ExtractionRefusedError:
     )
 
 
+def established_contradiction(left: Claim, right: Claim) -> bool:
+    """F-C1 R1: whether two claims are in ESTABLISHED CONTRADICTION.
+
+    The ratified rule (F-C1, 2026-09-09) is a six-condition conjunction,
+    evaluated with the S-3 primitives unchanged:
+
+        C1  same subject          (left.same_subject)
+        C2  same predicate        (left.same_predicate)
+        C3  identical qualifier   (left.same_qualifier)   [F-C1 Q2]
+        C4  both values quantified
+        C5  same unit
+        C6  values disagree outside the coarser stated precision
+            (not Quantity.agrees_with, whose tolerance is max precision)
+
+    Deliberately NOT `not values_agree(...)`: values_agree returns False
+    for one-sided quantification and for unit mismatch -- both
+    INCOMPARABLE, not contradictory (F-C1 R9). Collapsing them would
+    link pairs that can be simultaneously true.
+
+    Fail-closed [F-C1 INV-C5]: any condition that cannot be established
+    returns False -- "cannot establish contradiction" never links, and
+    stays distinguishable from "established contradiction" through the
+    S-3 verdict and reason already reported per peer. Pure function of
+    the two claims: no state, no interpretation, no wording judgement
+    (N-4; "checkable, not opinion", S-3). Type-blind [F-C1 R3]:
+    claim_type/attributed_to are Fact-payload fields, never consulted
+    or altered here (F-V4 preserved). Symmetric in its arguments.
+    """
+    if not left.same_subject(right):                 # C1
+        return False
+    if not left.same_predicate(right):               # C2
+        return False
+    if not left.same_qualifier(right):               # C3 [F-C1 Q2]
+        return False
+    if left.value is None or right.value is None:    # C4 (incomparable)
+        return False
+    if left.value.unit != right.value.unit:          # C5 (incomparable)
+        return False
+    return not left.value.agrees_with(right.value)   # C6 (disagreement)
+
+
 @dataclass(frozen=True)
 class ExtractionOutcome:
     """One accepted extraction. Traceable end to end.
@@ -915,7 +968,9 @@ class ExtractionOutcome:
     the surviving canonical Fact version when the claim merged
     (EQUIVALENT), otherwise None; `duplicates` lists the Facts linked
     DUPLICATES when equivalence was recognised but NOT merged
-    (CONTAINMENT/UNCERTAIN -- the S-3 conservative policy).
+    (CONTAINMENT/UNCERTAIN -- the S-3 conservative policy); `contradicts`
+    lists the ACTIVE Facts this extraction's new Fact is in established
+    contradiction with (T03.1.6/F-C1 R1) -- linked, never resolved.
     """
 
     fact: Fact
@@ -934,6 +989,14 @@ class ExtractionOutcome:
     duplicates: tuple[str, ...] = ()
     """object_ids of Facts linked DUPLICATES from this extraction's Fact
     (T03.1.4 AC3): equivalence recognised, never merged."""
+    contradicts: tuple[str, ...] = ()
+    """object_ids of ACTIVE Facts linked CONTRADICTS from this
+    extraction's new Fact (T03.1.6/F-C1 R1): established contradiction
+    -- same subject, same predicate, identical qualifier, same unit,
+    values outside stated precision. Linked, never resolved; both Facts
+    remain ACTIVE. Empty on the merge path: an EQUIVALENT extraction
+    creates no Fact, and the canonical's own links are inherited by its
+    merged versions [F-C1 R6]."""
 
 
     @property
@@ -1379,6 +1442,27 @@ def extract(
         if result.verdict in (Verdict.CONTAINMENT, Verdict.UNCERTAIN)
     )
 
+    # -- T03.1.6 / F-C1: established contradiction with ACTIVE peers.
+    # Same enumeration as duplicates_targets (ACTIVE registry order),
+    # decided from the two claims directly -- never from the S-3 verdict
+    # or its reason string, and never as "NOT_EQUIVALENT therefore
+    # contradiction" (F-C1 R1/R4: incomparable and merely-different
+    # claims also assess NOT_EQUIVALENT and MUST NOT link). CONTRADICTS
+    # peers are therefore a strict subset of NOT_EQUIVALENT peers,
+    # structurally disjoint from the CONTAINMENT/UNCERTAIN peers that
+    # receive DUPLICATES. Recorded on THIS new Fact only; peers are
+    # never mutated, and both Facts remain ACTIVE -- contradiction is
+    # represented, never resolved [F-C1 INV-C1..C4; OQ-03]. The merge
+    # path performs no detection: an EQUIVALENT extraction agrees with
+    # the canonical, so every peer it would contradict is already
+    # contradicted by the canonical, and the merged version inherits
+    # those links [F-C1 R6].
+    contradicts_targets = tuple(
+        peer.object_id
+        for peer, _result in store.facts.assess_all(claim)
+        if established_contradiction(claim, peer.claim)
+    )
+
     # -- Compose the Fact. [AC1, AC2, R-3, IOM S 3.2]
     support = evidence.attributes.confidence.effective_confidence
     identity = store.allocator.new_object()
@@ -1389,6 +1473,15 @@ def extract(
             f"conservative policy); DUPLICATES links recorded to "
             f"{list(duplicates_targets)} [T03.1.4]."
         )
+    contradiction_reasoning = ""
+    if contradicts_targets:
+        contradiction_reasoning = (
+            f" Established contradiction with {list(contradicts_targets)} "
+            f"(F-C1 R1: same subject, same predicate, identical "
+            f"qualifier, same unit, values outside stated precision); "
+            f"CONTRADICTS recorded -- linked, never resolved; both "
+            f"Facts remain ACTIVE [T03.1.6, F-C1]."
+        )
     attributes = UniversalAttributes(
         identity=identity,
         object_type=ObjectType.FACT,
@@ -1397,6 +1490,7 @@ def extract(
         engine_configuration_ref=request.engine_configuration_ref,
         derives_from=(LineageRef(request.evidence_ref, ObjectType.EVIDENCE),),
         duplicates=duplicates_targets,
+        contradicts=contradicts_targets,
         explanation=Explanation(
             objects_referenced=(request.evidence_ref,),
             criteria_applied=(
@@ -1413,7 +1507,7 @@ def extract(
                 f"{float(request.extraction_confidence):.2f} as supplied "
                 f"by the extractor; evidential support {support:.2f} "
                 f"taken from the source Evidence's own effective "
-                f"confidence{merge_reasoning}"
+                f"confidence{merge_reasoning}{contradiction_reasoning}"
             ),
         ),
         evidence_reachable=True,
@@ -1495,6 +1589,7 @@ def extract(
         locator=locator,
         merged_into=None,
         duplicates=duplicates_targets,
+        contradicts=contradicts_targets,
     )
 
 
