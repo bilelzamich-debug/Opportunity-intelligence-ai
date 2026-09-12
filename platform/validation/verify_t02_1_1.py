@@ -211,7 +211,7 @@ check("E", "integrity.py unchanged",
           (ROOT / "oip" / "integrity.py").read_bytes()).hexdigest()
       == "42f1a9507b9679a25cfef9321a07fa6a")
 check("E", "exactly seven Phase-2 modules exist (through directives)",
-      len(list((ROOT / "oip").glob("*.py"))) == 38,
+      len(list((ROOT / "oip").glob("*.py"))) == 39,  # 35 through T02.3.1; +1 extraction (T03.1.1); +1 anchoring (T03.1.3); +1 auditing (T03.2.2, F-A1); +1 inference (T04.1.1)
       # 35 through T02.3.1; +1 = extraction.py (T03.1.1); +1 = anchoring.py (T03.1.3)
       # +1 = auditing.py (T03.2.2, F-A1)
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")

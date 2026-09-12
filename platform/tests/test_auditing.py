@@ -2201,4 +2201,4 @@ class TestMetricSurfaceAndBoundaries:
         assert oip_imports == {
             "oip.enums", "oip.evidence", "oip.fact", "oip.source",
         }
-        assert len(list((root / "oip").glob("*.py"))) == 38
+        assert len(list((root / "oip").glob("*.py"))) == 39  # +1 inference (T04.1.1)

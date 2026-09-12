@@ -223,7 +223,7 @@ check("F", "module header names its task",
 check("F", "module does not claim to close a marker",
       not re.search(r"\bCloses\s*[:|]\s*M-\d+", SRC))
 check("F", "production module count is now 36 (incl. extraction, T03.1.1)",
-      len(list((ROOT / "oip").glob("*.py"))) == 38,  # 35 through T02.3.1; +1 extraction (T03.1.1); +1 anchoring (T03.1.3); +1 auditing (T03.2.2, F-A1)
+      len(list((ROOT / "oip").glob("*.py"))) == 39,  # 35 through T02.3.1; +1 extraction (T03.1.1); +1 anchoring (T03.1.3); +1 auditing (T03.2.2, F-A1); +1 inference (T04.1.1)
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("F", "Phase 1 modules unchanged",
       __import__("hashlib").md5(
