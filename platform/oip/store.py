@@ -185,6 +185,10 @@ class KnowledgeStore:
     _executions: "ExecutionRegistry | None" = field(default=None, init=False)
     _feedback: "FeedbackRegistry | None" = field(default=None, init=False)
     anchor_verifier: object | None = None
+    # S-5 Layer 2: sampled fidelity audit hook. [F-A1, T03.2.2]
+    # Mechanism only: the sampler is composed by install_sampled_audit
+    # (oip.auditing) and runs AFTER commitment, never as a gate.
+    audit_sampler: object | None = None
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     # -- write path -------------------------------------------------------
@@ -460,6 +464,19 @@ class KnowledgeStore:
                     merge_history=fact.merge_history,
                 )
             )
+            # S-5 Layer 2: sampled fidelity audit, AFTER commitment.
+            # [F-A1, T03.2.2] Audit is non-gating by ratification: there
+            # is no fourth N-2 gate, the committed acceptance stands
+            # whatever happens here, and the sampler contract
+            # (oip.auditing.install_sampled_audit) contains and records
+            # its own operational failures [N-10]. This guard is
+            # defense in depth so no sampler defect can ever disturb
+            # the write path.
+            if self.audit_sampler is not None:
+                try:
+                    self.audit_sampler(self.facts.get(stored.object_id))
+                except Exception:  # noqa: BLE001 -- non-gating [F-A1]
+                    pass
             return stored
 
     def get_fact(self, object_id: str) -> Fact | None:

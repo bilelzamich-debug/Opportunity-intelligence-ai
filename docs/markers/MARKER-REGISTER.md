@@ -16,7 +16,7 @@ Canonical authority: **PKP v2 §11** (contradictions), **§12** (open questions)
 
 | Category | Total | Closed | Partially closed | Open |
 |---|---|---|---|---|
-| Missing definitions (`M-nn`) | 70 | 22 | 4 | 44 |
+| Missing definitions (`M-nn`) | 70 | 23 | 4 | 43 |
 | Open questions (`OQ-nn`) | 24 | 8 | 0 | 16 |
 | Contradictions (`C-nn`) | 8 | 4 | 1 | 3 |
 
@@ -69,6 +69,12 @@ Canonical authority: **PKP v2 §11** (contradictions), **§12** (open questions)
 |---|---|---|
 | **OQ-28** | Source trust attribute | **N-20 §5.3** — fully closed |
 
+### Closed in Phase 3 (2026-09-12)
+
+| Marker | Gap | Closed by |
+|---|---|---|
+| M-20 | Extraction fidelity verification | **F-A2** — Layer-3 hallucination/drift quality metrics, implemented and verified by `T03.2.3` after F-A2 ratification; M-67 remains open |
+
 ---
 
 ## 3. Partially Closed Markers
@@ -109,7 +115,6 @@ ratification of N-21. **Zero backlog acceptance criteria depend on it.**
 | Marker | Gap |
 |---|---|
 | M-19 | What qualifies as a fact; extraction granularity |
-| M-20 | Extraction fidelity verification |
 | M-12 | Problem attributes — severity, frequency, population scales |
 | M-21 | Problem taxonomy |
 | M-22 | Problem identity and deduplication |

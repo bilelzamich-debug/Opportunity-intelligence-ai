@@ -253,8 +253,9 @@ check("D", "no retry policy, severity or backend invented (M-36 policy half)",
 check("D", "failure stages are exactly the ratified gate sequence",
       len(list(AcquisitionStage)) == 8)  # +OUT_OF_SCOPE (gate 1, N-20 5.2.1)
 check("D", "Production modules unchanged in count (35)",
-      len(list((ROOT / "oip").glob("*.py"))) == 37,
+      len(list((ROOT / "oip").glob("*.py"))) == 38,
       # 35 through T02.3.1; +1 = extraction.py (T03.1.1); +1 = anchoring.py (T03.1.3)
+      # +1 = auditing.py (T03.2.2, F-A1)
       f"{len(list((ROOT / 'oip').glob('*.py')))} modules")
 check("D", "Phase 1 modules unchanged",
       __import__("hashlib").md5(

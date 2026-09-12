@@ -453,8 +453,12 @@ check("D", "extraction.py oip-import SET unchanged (6/6, decomposition "
 check("D", "anchoring.py imports unchanged",
       mod_imports.get("anchoring") == {"extraction", "fact", "semantic"})
 
-check("D", "no new module: the count stays 37",
-      len(list((ROOT / "oip").glob("*.py"))) == 37)
+check("D", "auditing.py oip-import SET pinned (T03.2.2, F-A1)",
+      mod_imports.get("auditing") == {"enums", "evidence", "fact", "source"},
+      str(sorted(mod_imports.get("auditing", set()))))
+
+check("D", "module count is 38: auditing.py added [F-A1, T03.2.2]",
+      len(list((ROOT / "oip").glob("*.py"))) == 38)
 
 
 def has_cycle(graph: dict[str, set[str]]) -> bool:
