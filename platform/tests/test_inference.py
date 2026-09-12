@@ -1,6 +1,7 @@
 """Contract tests for the Problem Intelligence engine.
 
-Task: T04.1.1
+Task: T04.1.1 (standalone inference), T04.1.2 (solution-independence
+enforcement across versions)
 
 Architecture References:
 - S-4         Problem sufficiency: 2 independent sources across supporting
@@ -12,20 +13,30 @@ Architecture References:
              vs attempted never collapse
 - N-14        Facts are the direct input; Evidence beneath them readable
 - N-16        Tier 1 count derived from distinct independence keys
+- R-1/V11     Versioned mode: successor via allocator.succeed, version
+             increments, lineage_id constant
+- R-2         SUPERSEDED is terminal; the versioned write follows the
+             extraction merge precedent (dry-run, then transition, then
+             write; refusal names the surviving state)
 - R-3         Confidence bounded by the supporting Facts (V5)
 - R-6         SUPPORTS = the supporting subset of DERIVES_FROM
 - V7          Only Problem Intelligence creates Problems
 - P-V1..P-V6  Authoritative at acceptance, exercised end to end through
              store.write_problem -- never duplicated in these tests
+- P-I1        Solution-independence across ALL versions of the chain;
+             a clean successor never masks a violating earlier version
 
 Acceptance criteria under test:
   AC1  sufficiency threshold enforced (S-4 floor, independence-grouped)
   AC2  single-fact restatement rejected (P-V6, both prongs, via acceptance)
   AC3  inference_basis references specific Facts (exact coverage)
+  T04.1.2  the versioned path: reformulation supersedes the predecessor,
+       and solution-independence is enforced over every existing version
+       of the chain before any state changes
 
 Explicitly NOT under test here (later tasks): severity/frequency bands
 (T04.1.4), population identification (T04.1.3), deduplication (T04.1.5),
-taxonomy (T04.1.6), cross-version solution independence (T04.1.2).
+taxonomy (T04.1.6).
 """
 
 from __future__ import annotations
@@ -36,6 +47,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from oip.acceptance import FailureRecord, RuleOutcome, RuleResult
 from oip.contract import Engine, ObjectStatus, ObjectType
 from oip.enums import RelationshipType
 from oip.fact import Fact
@@ -54,7 +66,7 @@ from oip.problem import (
     Problem,
     ProblemError,
 )
-from oip.store import KnowledgeStore
+from oip.store import KnowledgeStore, WriteRejectedError
 from oip.support import sufficiency_threshold
 from tests.conftest import T0, build_attrs
 from tests.test_evidence import evidence as make_evidence
@@ -1133,3 +1145,834 @@ def test_property_confidence_and_ordering(confidence, order):
     assert attrs.confidence.effective_confidence <= confidence + 1e-9
     assert attrs.independent_source_count == 3
     assert outcome.independence_keys == frozenset(f"src-{t}" for t in ("p", "q", "r"))
+
+
+# ---------------------------------------------------------------------------
+# T04.1.2 -- the versioned path (reformulation)
+# ---------------------------------------------------------------------------
+#
+# The versioned mode adds one trigger: a new version of an existing
+# Problem. The standalone semantics above are untouched -- the first two
+# tests pin that -- and everything else here exercises the versioned
+# boundary: predecessor validation, chain-wide solution-independence
+# [P-I1], and the extraction-precedent write recipe (dry-run, transition,
+# write) with its failure surface closed BEFORE any state changes.
+#
+# Violating statements enter chains the same way the ProblemIntegrity
+# tests smuggle them: post-write mutation through object.__setattr__,
+# standing in for a path no single write controls.
+
+V2_STATEMENT = (
+    "Sellers with large catalogs silently lose update work when batch "
+    "operations exceed platform limits and discover the loss only "
+    "afterwards."
+)
+V3_STATEMENT = (
+    "Sellers operating at scale encounter silent partial failures of "
+    "bulk inventory updates across reporting periods."
+)
+V4_STATEMENT = (
+    "Sellers handling many simultaneous listings report that bulk changes "
+    "finish without any per-item outcome they can review."
+)
+ABSENCE_STATEMENT = (
+    "There is no way to confirm that batch updates completed."
+)
+REMEDY_STATEMENT = (
+    "Sellers need a notification service that confirms bulk updates."
+)
+
+_STATEMENTS = (STATEMENT, V2_STATEMENT, V3_STATEMENT, V4_STATEMENT)
+
+
+def versioned_request(*refs, statement, synthesis=None):
+    """A request whose statement is guaranteed distinct per call."""
+    return request_over(
+        *refs,
+        statement=statement,
+        synthesis=synthesis or f"Together these Facts show the deficiency as stated.",
+    )
+
+
+def infer_versioned(store, *refs, statement, predecessor_id, synthesis=None):
+    return infer(
+        versioned_request(*refs, statement=statement, synthesis=synthesis),
+        store=store,
+        log=InferenceLog(),
+        predecessor_id=predecessor_id,
+    )
+
+
+def build_chain(store, allocator, facts, depth):
+    """A clean chain of `depth` versions: standalone v1, then versioned."""
+    refs = tuple(f.object_id for f in facts)
+    first = infer(
+        versioned_request(*refs, statement=_STATEMENTS[0]), store=store, log=InferenceLog()
+    ).problem
+    chain = [first]
+    for level in range(1, depth):
+        chain.append(
+            infer_versioned(
+                store, *refs,
+                statement=_STATEMENTS[level % len(_STATEMENTS) if level < len(_STATEMENTS) else level],
+                predecessor_id=chain[-1].object_id,
+            ).problem
+        )
+    return chain
+
+
+def smuggle(store, object_id, statement):
+    """Post-write statement corruption, as in the P-I1 integrity tests."""
+    object.__setattr__(
+        store.get_problem(object_id), "problem_statement", statement
+    )
+
+
+class _NoLineageShell(StoreShell):
+    """A stored object that resolves to no lineage -- a broken store
+    invariant the real store cannot produce (every write registers a
+    lineage), guarded so the engine refuses rather than crashes."""
+
+    def resolve_lineage(self, object_id):
+        return None
+
+
+class _PayloadGapShell(StoreShell):
+    """A lineage version whose Problem payload is unregistered -- same
+    structural guard family as the standalone PAYLOAD_MISSING guard."""
+
+    def __init__(self, store, gap_id):
+        super().__init__(store)
+        self._gap_id = gap_id
+
+    def get_problem(self, object_id):
+        if object_id == self._gap_id:
+            return None
+        return self._inner.get_problem(object_id)
+
+
+class _TransitionRefusingShell(StoreShell):
+    """The store refuses the predecessor transition, mutating nothing."""
+
+    def transition(self, object_id, status, reason=None):
+        raise RuntimeError("transition refused by test shell")
+
+
+class _WriteRefusingShell(StoreShell):
+    """The store refuses the successor write after the transition."""
+
+    def __init__(self, store):
+        super().__init__(store)
+        self.transitioned = None
+
+    def transition(self, object_id, status, reason=None):
+        self.transitioned = (object_id, status)
+        return self._inner.transition(object_id, status, reason)
+
+    def write_problem(self, problem, predecessor_id=None):
+        raise WriteRejectedError(
+            FailureRecord(
+                object_id=problem.object_id,
+                object_type=ObjectType.PROBLEM,
+                failed_rules=(
+                    RuleResult(
+                        "P-V2", RuleOutcome.FAIL, "shell-injected refusal"
+                    ),
+                ),
+                recorded_at=datetime.now(timezone.utc),
+                engine_configuration_ref="test-shell",
+            )
+        )
+
+
+def refusal_of(call):
+    """Run `call`, return the recorded failure -- or None on success."""
+    log = InferenceLog()
+    try:
+        call(log)
+    except InferenceRefusedError:
+        return next(iter(log)), log
+    return None, log
+
+
+class TestStandalonePathUnchanged:
+    """T04.1.1 behavior with the extended signature. [backward compat]"""
+
+    def test_omitted_predecessor_id_is_standalone(self, store, allocator):
+        """#1 No predecessor_id: fresh identity, version 1, no predecessor
+        on the outcome -- exactly the T04.1.1 behavior."""
+        a, b = two_independent_facts(store, allocator)
+        outcome = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog())
+        assert outcome.predecessor_id is None
+        assert outcome.problem.attributes.version == 1
+        assert outcome.problem.attributes.identity.is_initial
+
+    def test_explicit_none_equals_omitted(self, store, allocator):
+        """#2 predecessor_id=None is the same call, not a third mode."""
+        a, b = two_independent_facts(store, allocator)
+        outcome = infer(
+            request_over(a.object_id, b.object_id),
+            store=store, log=InferenceLog(), predecessor_id=None,
+        )
+        assert outcome.predecessor_id is None
+        assert store.find(outcome.object_id).status is ObjectStatus.ACTIVE
+
+
+class TestVersionedAbsenceFramed:
+    """T04.1.2 AC1: absence-framed statements rejected on the versioned
+    path, by the authoritative P-V2, before any state changes."""
+
+    def test_absence_framed_successor_refused(self, store, allocator):
+        """#3 'There is no way to...' smuggles a solution presence."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=ABSENCE_STATEMENT),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure is not None
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert "P-V2" in failure.detail
+
+    def test_remedy_framed_successor_refused(self, store, allocator):
+        """#4 'need a ...' framing refused identically."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=REMEDY_STATEMENT),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure is not None
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert "P-V2" in failure.detail
+        assert failure.attempted is True
+
+    def test_refusal_precedes_the_transition(self, store, allocator):
+        """#5 The dry-run refusal leaves the predecessor ACTIVE and the
+        lineage at one version: nothing was superseded for a statement
+        that could never be written."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=ABSENCE_STATEMENT),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert store.find(v1.object_id).status is ObjectStatus.ACTIVE
+        assert len(store.versions_of(v1.attributes.identity.lineage_id)) == 1
+
+
+class TestVersionedChain:
+    """T04.1.2 AC2: clean reformulation succeeds; a violating version
+    anywhere in the chain refuses the write. [P-I1, R-1/V11]"""
+
+    def test_clean_v1_to_v2_succeeds(self, store, allocator):
+        """#6 The happy path: a clean successor is accepted."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        outcome = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.problem_statement == V2_STATEMENT
+        assert outcome.predecessor_id == v1.object_id
+        assert store.get_problem(outcome.object_id) is not None
+
+    def test_predecessor_becomes_superseded(self, store, allocator):
+        """#7 The reformulation transition: v1 ACTIVE -> SUPERSEDED."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        assert store.find(v1.object_id).status is ObjectStatus.SUPERSEDED
+        assert store.find(v1.object_id).attributes.status_reason is not None
+
+    def test_successor_is_active(self, store, allocator):
+        """#8 I5: the successor takes over as the lineage's ACTIVE
+        version."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        assert store.find(v2.object_id).status is ObjectStatus.ACTIVE
+
+    def test_version_increments(self, store, allocator):
+        """#9 R-1/V11 via allocator.succeed: v2 is predecessor+1."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        assert v1.attributes.version == 1
+        assert v2.attributes.version == 2
+        assert {v.object_id for v in store.versions_of(
+            v1.attributes.identity.lineage_id
+        )} == {v1.object_id, v2.object_id}
+
+    def test_lineage_id_constant(self, store, allocator):
+        """#10 The successor is a new version of the SAME logical
+        object."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        assert (
+            v2.attributes.identity.lineage_id
+            == v1.attributes.identity.lineage_id
+        )
+
+    def test_every_version_of_a_deep_chain_is_checked(self, store, allocator):
+        """#11 A four-deep clean chain extends; a violation in the MIDDLE
+        version is still caught, so enumeration cannot stop at the
+        latest."""
+        a, b = two_independent_facts(store, allocator)
+        chain = build_chain(store, allocator, (a, b), depth=4)
+        lineage = chain[0].attributes.identity.lineage_id
+        assert len(store.versions_of(lineage)) == 4
+        smuggle(store, chain[1].object_id, ABSENCE_STATEMENT)  # v2, middle
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V4_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=chain[-1].object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT
+        assert chain[1].object_id in failure.detail
+
+    def test_clean_latest_does_not_bypass_violating_earlier(self, store, allocator):
+        """#12 The core P-I1 semantics: a clean ACTIVE successor cannot
+        make a violating SUPERSEDED ancestor acceptable."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        smuggle(store, v1.object_id, ABSENCE_STATEMENT)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V3_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v2.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT
+        assert v1.object_id in failure.detail
+        assert v2.object_id not in failure.detail  # only the violator named
+
+    def test_violating_active_predecessor_refused(self, store, allocator):
+        """#13 A violating predecessor refuses however clean the proposed
+        successor."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        smuggle(store, v1.object_id, REMEDY_STATEMENT)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V2_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT
+        assert "need a" in failure.detail  # the marker is named
+
+
+class TestPredecessorValidation:
+    """Refusal stages for an unusable predecessor. [N-10]"""
+
+    def test_unknown_predecessor_refused(self, store, allocator):
+        """#14 PREDECESSOR_NOT_FOUND: nothing to supersede."""
+        a, b = two_independent_facts(store, allocator)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=V2_STATEMENT),
+                store=store, log=log, predecessor_id="obj-nonexistent",
+            )
+        )
+        assert failure.stage is InferenceStage.PREDECESSOR_NOT_FOUND
+        assert failure.attempted is False
+
+    def test_fact_predecessor_refused(self, store, allocator):
+        """#15 PREDECESSOR_NOT_A_PROBLEM: Problem Intelligence modifies
+        Problems only. [V7]"""
+        a, b = two_independent_facts(store, allocator)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=V2_STATEMENT),
+                store=store, log=log, predecessor_id=a.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.PREDECESSOR_NOT_A_PROBLEM
+        assert failure.attempted is False
+
+    def test_superseded_predecessor_refused(self, store, allocator):
+        """#16 PREDECESSOR_NOT_ACTIVE: only an ACTIVE version may be
+        superseded. [R-2]"""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V3_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.PREDECESSOR_NOT_ACTIVE
+        assert failure.attempted is False
+        assert "SUPERSEDED" in failure.detail
+
+    def test_stages_distinguishable_under_n10(self, store, allocator):
+        """#17 Every stage is a distinct, recorded failure; the
+        resolution stages are not-attempted, the chain stage is
+        attempted, and none collapses into a generic error."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        smuggle(store, v1.object_id, ABSENCE_STATEMENT)
+        seen = {}
+        for predecessor, key in (
+            ("obj-nonexistent", "not_found"),
+            (a.object_id, "not_a_problem"),
+        ):
+            failure, _ = refusal_of(
+                lambda log, p=predecessor: infer(
+                    versioned_request(
+                        a.object_id, b.object_id, statement=V2_STATEMENT
+                    ),
+                    store=store, log=log, predecessor_id=p,
+                )
+            )
+            seen[key] = (failure.stage, failure.reason, failure.attempted)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V2_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        seen["chain"] = (failure.stage, failure.reason, failure.attempted)
+        stages = {entry[0] for entry in seen.values()}
+        assert len(stages) == 3  # all distinguishable
+        assert all(entry[2] is False for k, entry in seen.items() if k != "chain")
+        assert seen["chain"][2] is True
+
+
+class TestVersionedAtomicity:
+    """No partial state on any versioned refusal. [R-2, N-10]"""
+
+    def test_write_failure_after_transition_names_surviving_state(
+        self, store, allocator
+    ):
+        """#18 The extraction-precedent residual: SUPERSEDED is terminal,
+        so no restore exists -- the refusal names the exact surviving
+        state instead. Predecessor SUPERSEDED with payload intact, no
+        successor, refusal recorded."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        shell = _WriteRefusingShell(store)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=V2_STATEMENT),
+                store=shell, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert failure.reason == "WRITE_FAILED_AFTER_TRANSITION"
+        assert shell.transitioned == (v1.object_id, ObjectStatus.SUPERSEDED)
+        # Surviving state, exactly as named:
+        assert store.find(v1.object_id).status is ObjectStatus.SUPERSEDED
+        assert store.get_problem(v1.object_id).problem_statement == STATEMENT
+        assert len(store.versions_of(v1.attributes.identity.lineage_id)) == 1
+        assert len(store.problems) == 1
+
+    def test_transition_failure_leaves_predecessor_unchanged(
+        self, store, allocator
+    ):
+        """#19 A failed transition mutates nothing: the predecessor
+        stays ACTIVE, no successor exists."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        shell = _TransitionRefusingShell(store)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=V2_STATEMENT),
+                store=shell, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert failure.reason == "PREDECESSOR_TRANSITION_FAILED"
+        assert store.find(v1.object_id).status is ObjectStatus.ACTIVE
+        assert len(store.versions_of(v1.attributes.identity.lineage_id)) == 1
+        assert len(store.problems) == 1
+
+    def test_chain_refusal_leaves_store_unchanged(self, store, allocator):
+        """#20 The chain refusal precedes every gate that writes."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        smuggle(store, v1.object_id, ABSENCE_STATEMENT)
+        before = (
+            len(store.problems),
+            tuple(
+                (v.object_id, v.status) for v in store.versions_of(
+                    v1.attributes.identity.lineage_id
+                )
+            ),
+        )
+        refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V3_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v2.object_id,
+            )
+        )
+        after = (
+            len(store.problems),
+            tuple(
+                (v.object_id, v.status) for v in store.versions_of(
+                    v1.attributes.identity.lineage_id
+                )
+            ),
+        )
+        assert before == after
+
+    def test_dry_run_refusal_leaves_store_unchanged(self, store, allocator):
+        """#21 The dry-run refusal precedes the transition."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        before = (
+            store.find(v1.object_id).status,
+            len(store.versions_of(v1.attributes.identity.lineage_id)),
+            len(store.problems),
+        )
+        refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=REMEDY_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        after = (
+            store.find(v1.object_id).status,
+            len(store.versions_of(v1.attributes.identity.lineage_id)),
+            len(store.problems),
+        )
+        assert before == after
+
+    def test_validation_refusals_create_nothing(self, store, allocator):
+        """#22 Predecessor-validation refusals are not-attempted: no
+        object, no version, no registry entry appears."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        problems_before = len(store.problems)
+        for predecessor in ("obj-nonexistent", a.object_id):
+            refusal_of(
+                lambda log, p=predecessor: infer(
+                    versioned_request(
+                        a.object_id, b.object_id, statement=V2_STATEMENT
+                    ),
+                    store=store, log=log, predecessor_id=p,
+                )
+            )
+        assert len(store.problems) == problems_before
+        assert len(store.versions_of(v1.attributes.identity.lineage_id)) == 1
+
+
+    def test_unresolvable_lineage_refuses_not_crashes(self, store, allocator):
+        """A predecessor that resolves to no lineage is a broken store
+        invariant: the engine refuses with a recorded failure rather
+        than asserting anything. [N-10]"""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        shell = _NoLineageShell(store)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(a.object_id, b.object_id, statement=V2_STATEMENT),
+                store=shell, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.PREDECESSOR_NOT_FOUND
+        assert failure.reason == "NO_LINEAGE"
+        assert failure.attempted is False
+
+    def test_unreadable_chain_version_refuses_fail_closed(self, store, allocator):
+        """A version whose payload cannot be read cannot be certified
+        solution-independent: the chain check refuses and names the gap
+        instead of certifying what it never read. [P-I1, N-10]"""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        shell = _PayloadGapShell(store, v1.object_id)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V3_STATEMENT
+                ),
+                store=shell, log=log, predecessor_id=v2.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert failure.reason == "REGISTRY_GAP"
+        assert failure.attempted is True
+        assert v1.object_id in failure.detail
+
+
+class TestVersionedDeterminism:
+    """Properties, never output equality. [N-4]"""
+
+    def test_same_inputs_same_version_structure(self, store, allocator):
+        """#23 Two identically-seeded runs produce isomorphic version
+        structures: version 2, one lineage, one ACTIVE version."""
+        results = []
+        for _ in range(2):
+            s = KnowledgeStore()
+            a, b = two_independent_facts(s, s.allocator)
+            v1 = infer(request_over(a.object_id, b.object_id), store=s, log=InferenceLog()).problem
+            v2 = infer_versioned(
+                s, a.object_id, b.object_id,
+                statement=V2_STATEMENT, predecessor_id=v1.object_id,
+            ).problem
+            results.append(
+                (
+                    v1.attributes.version,
+                    v2.attributes.version,
+                    v2.attributes.identity.lineage_id
+                    == v1.attributes.identity.lineage_id,
+                    len(s.versions_of(v1.attributes.identity.lineage_id)),
+                    sum(
+                        1
+                        for v in s.versions_of(v1.attributes.identity.lineage_id)
+                        if v.status is ObjectStatus.ACTIVE
+                    ),
+                )
+            )
+        assert results[0] == results[1]
+
+    def test_chain_enumeration_order_is_deterministic(self, store, allocator):
+        """#24 A multi-violation chain names its violators in a stable
+        order, so the refusal is reproducible."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        v3 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V3_STATEMENT, predecessor_id=v2.object_id,
+        ).problem
+        smuggle(store, v2.object_id, ABSENCE_STATEMENT)
+        smuggle(store, v1.object_id, REMEDY_STATEMENT)
+        details = []
+        for _ in range(3):
+            failure, _ = refusal_of(
+                lambda log: infer(
+                    versioned_request(
+                        a.object_id, b.object_id, statement=V4_STATEMENT
+                    ),
+                    store=store, log=log, predecessor_id=v3.object_id,
+                )
+            )
+            details.append(failure.detail)
+        assert len(set(details)) == 1  # identical across repetitions
+        assert details[0].index(v1.object_id) < details[0].index(v2.object_id)
+
+
+class TestVersionedAcceptanceIntegration:
+    """The authoritative rules, not engine copies, decide. [P-V1..P-V6]"""
+
+    def test_pv2_authoritative_on_the_versioned_path(self, store, allocator):
+        """#25 The dry-run invokes the authoritative P-V2 and names it in
+        the refusal."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=REMEDY_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert "P-V2" in failure.detail
+        assert "need a" in failure.detail
+
+    def test_v11_authoritative_successor_identity(self, store, allocator):
+        """#26 The successor identity comes from allocator.succeed:
+        version increments, lineage constant, predecessor linked."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        assert v2.attributes.version == v1.attributes.version + 1
+        assert {v.object_id for v in store.versions_of(
+            v1.attributes.identity.lineage_id
+        )} == {v1.object_id, v2.object_id}
+        assert (
+            v2.attributes.identity.lineage_id
+            == v1.attributes.identity.lineage_id
+        )
+
+    def test_i5_one_active_version_per_lineage(self, store, allocator):
+        """#27 After the versioned write the lineage holds exactly one
+        ACTIVE version: the successor."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        active = [
+            v.object_id
+            for v in store.versions_of(v1.attributes.identity.lineage_id)
+            if v.status is ObjectStatus.ACTIVE
+        ]
+        assert active == [v2.object_id]
+
+    def test_pi1_intact_and_consistent(self, store, allocator):
+        """#28 The engine's write-time chain refusal and the detective
+        P-I1 agree: a chain the engine refuses is a chain integrity
+        flags."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        smuggle(store, v1.object_id, ABSENCE_STATEMENT)
+        violations = store.problems.integrity().verify()
+        assert any(v.constraint_id == "P-I1" for v in violations)
+        failure, _ = refusal_of(
+            lambda log: infer(
+                versioned_request(
+                    a.object_id, b.object_id, statement=V3_STATEMENT
+                ),
+                store=store, log=log, predecessor_id=v2.object_id,
+            )
+        )
+        assert failure.stage is InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT
+
+
+class TestVersionedScopeBoundaries:
+    """What the versioned path deliberately does NOT do. [M-21, M-22,
+    Master Reference 4.6 boundaries]"""
+
+    def test_no_duplicates_links_created(self, store, allocator):
+        """#29 Versioning is R-1 succession, never a DUPLICATES link."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        v2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=v1.object_id,
+        ).problem
+        for oid in (v1.object_id, v2.object_id):
+            assert store.graph.parents(oid, RelationshipType.DUPLICATES) == frozenset()
+            assert store.graph.children(oid, RelationshipType.DUPLICATES) == frozenset()
+
+    def test_no_dedup_across_lineages(self, store, allocator):
+        """#30 Two lineages stating the same deficiency stay two
+        lineages: no merging, no identity unification (T04.1.5)."""
+        a, b = two_independent_facts(store, allocator)
+        p = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        q = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        assert p.attributes.identity.lineage_id != q.attributes.identity.lineage_id
+        p2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=p.object_id,
+        ).problem
+        q2 = infer_versioned(
+            store, a.object_id, b.object_id,
+            statement=V2_STATEMENT, predecessor_id=q.object_id,
+        ).problem
+        assert (
+            p2.attributes.identity.lineage_id
+            != q2.attributes.identity.lineage_id
+        )
+        assert len(store.problems) == 4  # nothing merged
+
+    def test_no_population_widening(self, store, allocator):
+        """#31 affected_population is carried exactly as requested; the
+        engine widens nothing (T04.1.3)."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        narrow = "Segment B sellers with more than 500 active listings."
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT,
+                population=narrow,
+                synthesis="Together these Facts show the deficiency for the narrow segment.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        assert v2.affected_population == narrow
+        assert v1.affected_population == POPULATION  # predecessor untouched
+
+    def test_no_severity_ranking(self, store, allocator):
+        """#32 Severity stays free text, carried unchanged, never
+        ordered or ranked (T04.1.4, M-12)."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, severity="LOW -- minor friction"),
+            store=store, log=InferenceLog(),
+        ).problem
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT, severity="CRITICAL -- revenue halting",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        assert v2.severity == "CRITICAL -- revenue halting"
+        assert v1.severity == "LOW -- minor friction"
+        assert not hasattr(v2, "severity_rank")
+
+    def test_no_taxonomy_constraints(self, store, allocator):
+        """#33 problem_domain is unconstrained free text (T04.1.6,
+        M-21)."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, domain="A domain no taxonomy contains"),
+            store=store, log=InferenceLog(),
+        ).problem
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT,
+                domain="Another unregulated domain entirely",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        assert v2.problem_domain == "Another unregulated domain entirely"

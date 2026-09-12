@@ -1,6 +1,7 @@
-"""Problem inference: Facts judged to indicate a deficiency. [T04.1.1]
+"""Problem inference: Facts judged to indicate a deficiency. [T04.1.1, T04.1.2]
 
-Task: T04.1.1
+Task: T04.1.1 (standalone inference), T04.1.2 (solution-independence
+enforcement across versions)
 
 Architecture References:
 - S-4    Problem sufficiency floor: 2 independent sources across the
@@ -22,6 +23,17 @@ Architecture References:
          inputs' independence relationships: distinct independence keys
          across the supporting Facts' Evidence. Never a blind sum of
          per-Fact counts; never a re-traversal past Evidence.
+- R-1/V11
+         Content change produces a NEW version: the versioned path
+         (predecessor_id) allocates the successor via allocator.succeed
+         (version = predecessor + 1, lineage_id constant) and persists
+         through write_problem(..., predecessor_id=...). [T04.1.2]
+- R-2    SUPERSEDED is terminal: no outgoing transitions. The versioned
+         write therefore follows the extraction merge precedent --
+         transition predecessor, then write successor, with the failure
+         surface structurally closed BEFORE the transition (the
+         authoritative PROBLEM_RULES dry-run) and any residual write
+         refusal naming the exact surviving state. [T04.1.2]
 - R-3    Two-component confidence: evidential_support from S-2 over the
          supporting Facts (P6 bounds it by their support), assertion_
          confidence is the inferer's supplied certainty, effective bounded
@@ -37,6 +49,13 @@ Architecture References:
          gates are preconditions, never a bypass: P-V1 re-checks the
          declared count, P-V6 rejects single-Fact restatements and
          verbatim claim restatements, P-V5 re-checks the basis.
+- P-I1   Solution-independence across ALL versions. [T04.1.2] Enforced at
+         the versioned-write boundary: every version in the predecessor's
+         lineage is evaluated with the authoritative
+         detect_solution_language (the P-V2 machinery -- no second
+         lexical definition), and a chain never becomes acceptable
+         merely because its newest version is clean. P-V2 at acceptance
+         and ProblemIntegrity's P-I1 re-check remain authoritative.
 - IOM    section 3.3 (Problem object); Master Reference section 4.6
          (engine responsibility and boundaries).
 
@@ -50,13 +69,19 @@ IS the PROPOSED -> ACTIVE transition, and an inference that cannot clear
 acceptance is refused with a recorded failure rather than persisted in a
 weaker state.
 
+The versioned path (T04.1.2) adds reformulation: a new version of an
+existing Problem -- the IOM's "reformulation" versioning trigger --
+entering through the same acceptance, with the predecessor transitioned
+ACTIVE -> SUPERSEDED and solution-independence verified over the whole
+version chain before any state changes.
+
 Scope: the inference engine only. Severity/frequency bands (T04.1.4,
 M-12), population identification (T04.1.3), deduplication (T04.1.5,
-M-22), taxonomy (T04.1.6, M-21) and cross-version solution independence
-(T04.1.2) are deliberately absent. The engine never merges, never links
-DUPLICATES, never ranks weight, never constrains problem_domain, and
-never acquires evidence when support is insufficient -- it refuses
-(Master Reference 4.6 boundaries; OPEN QUESTION-11 stays open).
+M-22) and taxonomy (T04.1.6, M-21) are deliberately absent. The engine
+never merges, never links DUPLICATES, never ranks weight, never
+constrains problem_domain, and never acquires evidence when support is
+insufficient -- it refuses (Master Reference 4.6 boundaries; OPEN
+QUESTION-11 stays open).
 """
 
 from __future__ import annotations
@@ -67,7 +92,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Callable, Iterator
 
-from oip.acceptance import FailureRecord, RuleOutcome, RuleResult
+from oip.acceptance import (
+    AcceptanceContext,
+    FailureRecord,
+    RuleOutcome,
+    RuleResult,
+)
 from oip.contract import (
     Confidence,
     Engine,
@@ -79,8 +109,14 @@ from oip.contract import (
     utc_now,
 )
 from oip.fact import Fact
-from oip.problem import FactContribution, InferenceBasis, Problem
-from oip.store import KnowledgeStore, WriteRejectedError
+from oip.problem import (
+    PROBLEM_RULES,
+    FactContribution,
+    InferenceBasis,
+    Problem,
+    detect_solution_language,
+)
+from oip.store import KnowledgeStore, StoreError, WriteRejectedError
 from oip.support import SupportInputs, compute_support, sufficiency_threshold
 
 
@@ -121,6 +157,11 @@ class InferenceStage(str, Enum):
     INSUFFICIENT_SOURCES = "INSUFFICIENT_SOURCES"
     TEMPORAL_CONFLICT = "TEMPORAL_CONFLICT"
     STORE_REJECTED = "STORE_REJECTED"
+    # T04.1.2: the versioned path (reformulation). [P-V2, P-I1, R-1/V11]
+    PREDECESSOR_NOT_FOUND = "PREDECESSOR_NOT_FOUND"
+    PREDECESSOR_NOT_A_PROBLEM = "PREDECESSOR_NOT_A_PROBLEM"
+    PREDECESSOR_NOT_ACTIVE = "PREDECESSOR_NOT_ACTIVE"
+    CHAIN_NOT_SOLUTION_INDEPENDENT = "CHAIN_NOT_SOLUTION_INDEPENDENT"
 
 
 # Stages at which the sufficiency judgement was actually evaluated against
@@ -130,10 +171,16 @@ class InferenceStage(str, Enum):
 # hypothesis, so "ran and found nothing" has no meaning here, and the
 # found-nothing distinction extraction needs does not collapse into
 # anything -- it simply does not arise. [N-10]
+#
+# CHAIN_NOT_SOLUTION_INDEPENDENT is attempted [T04.1.2]: the chain was in
+# hand and the solution-independence judgement ran over every version.
+# The predecessor-resolution stages are not-attempted, like every other
+# input-resolution failure.
 _ATTEMPTED_STAGES = frozenset(
     {
         InferenceStage.INSUFFICIENT_SOURCES,
         InferenceStage.STORE_REJECTED,
+        InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT,
     }
 )
 
@@ -437,6 +484,9 @@ class InferenceOutcome:
     source_type_count: int
     evidential_support: float
     assertion_confidence: float
+    predecessor_id: str | None = None
+    """The superseded predecessor when this was a versioned inference
+    (T04.1.2 reformulation); None on the standalone path."""
 
     @property
     def object_id(self) -> str:
@@ -487,23 +537,209 @@ def _failure(
     )
 
 
+# ---------------------------------------------------------------------------
+# Versioned path  [T04.1.2]
+# ---------------------------------------------------------------------------
+
+
+def _claim_text_of(store: KnowledgeStore) -> Callable[[str], str | None]:
+    """Claim text of a stored Fact, through public reads. [P-V6]"""
+
+    def claim_text(object_id: str) -> str | None:
+        fact = store.get_fact(object_id)
+        return fact.claim.as_text() if fact is not None else None
+
+    return claim_text
+
+
+def _resolve_predecessor(
+    request: InferenceRequest,
+    predecessor_id: str,
+    store: KnowledgeStore,
+    log: InferenceLog,
+    now: datetime,
+) -> UniversalAttributes:
+    """Resolve, type-check and eligibility-check the predecessor. [T04.1.2]
+
+    V7: Problem Intelligence modifies Problems, so the predecessor must be
+    one. R-2/IOM 3.3: the reformulation transition is ACTIVE -> SUPERSEDED,
+    so a non-ACTIVE predecessor has no legal path. No state changes here.
+    """
+    stored = store.find(predecessor_id)
+    if stored is None:
+        failure = _failure(
+            request, InferenceStage.PREDECESSOR_NOT_FOUND, "NOT_STORED",
+            f"predecessor {predecessor_id!r} does not exist in the store; "
+            f"a reformulation must name the version it supersedes [T04.1.2]",
+            log, now,
+        )
+        raise _refuse(failure)
+    if stored.attributes.object_type is not ObjectType.PROBLEM:
+        failure = _failure(
+            request, InferenceStage.PREDECESSOR_NOT_A_PROBLEM, "NOT_A_PROBLEM",
+            f"predecessor {predecessor_id!r} is "
+            f"{stored.attributes.object_type.value}, but Problem "
+            f"Intelligence modifies Problems only [V7, T04.1.2]",
+            log, now,
+        )
+        raise _refuse(failure)
+    if stored.status is not ObjectStatus.ACTIVE:
+        failure = _failure(
+            request, InferenceStage.PREDECESSOR_NOT_ACTIVE,
+            stored.status.value,
+            f"predecessor {predecessor_id!r} is {stored.status.value}; the "
+            f"reformulation transition is ACTIVE -> SUPERSEDED, and only "
+            f"an ACTIVE version may be superseded [R-2, IOM 3.3, T04.1.2]",
+            log, now,
+        )
+        raise _refuse(failure)
+    return stored.attributes
+
+
+def _check_chain_solution_independence(
+    request: InferenceRequest,
+    predecessor_id: str,
+    store: KnowledgeStore,
+    log: InferenceLog,
+    now: datetime,
+) -> None:
+    """Solution-independence over EVERY version of the predecessor's
+    lineage. [P-I1, T04.1.2]
+
+    Uses the authoritative P-V2 machinery (detect_solution_language with
+    its default marker set) -- no second lexical definition. A chain never
+    becomes acceptable merely because its newest version is clean: if ANY
+    existing version trips the detector, the versioned inference refuses,
+    however clean the proposed successor. The proposed statement itself is
+    held to the same standard by the authoritative dry-run below and by
+    P-V2 at acceptance. Enumeration order cannot change the verdict: every
+    version is evaluated and every violation is named.
+    """
+    lineage_id = store.resolve_lineage(predecessor_id)
+    if lineage_id is None:  # defensive: find() resolved it above
+        failure = _failure(
+            request, InferenceStage.PREDECESSOR_NOT_FOUND, "NO_LINEAGE",
+            f"predecessor {predecessor_id!r} resolves to no lineage",
+            log, now,
+        )
+        raise _refuse(failure)
+
+    violations: list[tuple[str, int, tuple[str, ...]]] = []
+    for version in store.versions_of(lineage_id):
+        payload = store.get_problem(version.object_id)
+        if payload is None:
+            # Fail-closed, the engine's guard philosophy: a version whose
+            # payload cannot be read cannot be certified solution-
+            # independent, so the chain cannot be verified -- refuse and
+            # name the gap rather than certify what was never read.
+            # Unreachable through the real store (payload registers in
+            # the same critical section as the object); guarded anyway.
+            # [N-10, P-I1, T04.1.2]
+            failure = _failure(
+                request, InferenceStage.STORE_REJECTED, "REGISTRY_GAP",
+                f"version {version.object_id!r} of lineage {lineage_id!r} "
+                f"has no Problem payload; the chain cannot be verified "
+                f"solution-independent, so the versioned inference is "
+                f"refused [P-I1, T04.1.2]",
+                log, now,
+            )
+            raise _refuse(failure)
+        markers = detect_solution_language(payload.problem_statement)
+        if markers:
+            violations.append(
+                (version.object_id, version.attributes.version, markers)
+            )
+
+    if violations:
+        described = "; ".join(
+            f"v{version} {oid!r}: {list(markers)}"
+            for oid, version, markers in violations
+        )
+        failure = _failure(
+            request, InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT,
+            "VERSION_STATES_A_SOLUTION",
+            f"solution-independence must hold across ALL versions [P-I1]; "
+            f"violating version(s) of lineage {lineage_id!r}: {described}. "
+            f"A clean successor cannot make the chain acceptable, so the "
+            f"versioned inference is refused [T04.1.2]",
+            log, now,
+        )
+        raise _refuse(failure)
+
+
+def _dry_run_problem_rules(
+    request: InferenceRequest,
+    problem: Problem,
+    store: KnowledgeStore,
+    log: InferenceLog,
+    now: datetime,
+) -> None:
+    """Run the AUTHORITATIVE P-V1..P-V6 over the composed successor, before
+    any state changes. [T04.1.2]
+
+    The versioned-write failure surface is structurally closed, extraction
+    merge precedent: SUPERSEDED is terminal under R-2, so a successor-write
+    rejection after the predecessor transition cannot be undone. Every
+    acceptance rule that could reject the successor is therefore satisfied
+    BEFORE the predecessor is touched -- by invoking the authoritative
+    PROBLEM_RULES themselves (public rule functions over a public
+    AcceptanceContext, exactly as the store does), never a re-implementation.
+    The universal rules V1-V12 are closed by construction, mirroring the
+    merge argument: V1/V9 by construction, V2/V3/V12 by resolved Facts,
+    V4 by Fact lineage, V5 by the derived ceiling, V6 by the explanation,
+    V7 by the engine, V8 by the pre-check, V10 by upstream-only references,
+    V11 by allocator.succeed(). Should the write still fail, the refusal
+    names the exact surviving state. [R-2, N-10]
+    """
+    ctx = AcceptanceContext(
+        attributes=problem.attributes,
+        problem=problem,
+        fact_claim_text=_claim_text_of(store),
+    )
+    failed = [rule(ctx) for rule in PROBLEM_RULES]
+    failures = [result for result in failed if result.failed]
+    if failures:
+        rule_ids = ", ".join(result.rule_id for result in failures)
+        details = "; ".join(result.detail for result in failures)
+        failure = _failure(
+            request, InferenceStage.STORE_REJECTED, "DRY_RUN_REFUSED",
+            f"the authoritative acceptance rules would refuse this "
+            f"successor: {rule_ids} -- {details}; refused BEFORE the "
+            f"predecessor was superseded, so no state has changed "
+            f"[P-V1..P-V6, T04.1.2]",
+            log, now,
+        )
+        raise _refuse(failure)
+
+
 def infer(
     request: InferenceRequest,
     *,
     store: KnowledgeStore,
     log: InferenceLog,
     clock: Callable[[], datetime] = utc_now,
+    predecessor_id: str | None = None,
 ) -> InferenceOutcome:
     """Infer one Problem from named supporting Facts. [AC1, AC2, AC3]
 
-    Fail-closed throughout: a Problem exists only after every gate
-    passed -- request validity, Fact resolution and ACTIVE eligibility
-    (P-I2 as an input precondition), Evidence resolution beneath the
-    Facts (N-14 grant), the S-4 independence derivation (N-16), temporal
-    consistency (V8), and the store's own acceptance path (P-V1..P-V6
-    over the universal rules). Any refusal is recorded in the log -- and
-    projected into an attached FailureStore -- before the exception is
-    raised, so no refusal is ever silent and no partial trace remains.
+    Standalone mode (predecessor_id=None, T04.1.1): fail-closed throughout;
+    a Problem exists only after every gate passed -- request validity, Fact
+    resolution and ACTIVE eligibility (P-I2 as an input precondition),
+    Evidence resolution beneath the Facts (N-14 grant), the S-4
+    independence derivation (N-16), temporal consistency (V8), and the
+    store's own acceptance path (P-V1..P-V6 over the universal rules).
+
+    Versioned mode (predecessor_id, T04.1.2 reformulation): the predecessor
+    is resolved, type-checked and ACTIVE-checked, the whole version chain
+    is verified solution-independent (P-I1), the same standalone gates run,
+    the successor is composed under allocator.succeed (R-1/V11), the
+    authoritative PROBLEM_RULES dry-run closes the write-failure surface,
+    and only then is the predecessor transitioned ACTIVE -> SUPERSEDED and
+    the successor persisted through write_problem(..., predecessor_id=...).
+
+    Any refusal is recorded in the log -- and projected into an attached
+    FailureStore -- before the exception is raised, so no refusal is ever
+    silent and no partial trace remains.
     """
     now = clock()
 
@@ -515,6 +751,19 @@ def infer(
             f"expected an InferenceRequest, got {request!r}", log, now,
         )
         raise _refuse(failure)
+
+    # -- T04.1.2 versioned mode preamble. No state changes on any refusal
+    # here: the predecessor is resolved, type-checked, eligibility-checked,
+    # and its whole version chain verified solution-independent [P-I1]
+    # before the shared gates run.
+    predecessor_attributes: UniversalAttributes | None = None
+    if predecessor_id is not None:
+        predecessor_attributes = _resolve_predecessor(
+            request, predecessor_id, store, log, now
+        )
+        _check_chain_solution_independence(
+            request, predecessor_id, store, log, now
+        )
 
     # -- Fact resolution: only what the store holds can support an
     # inference, and only Facts -- the N-14 direct input type. [N-14]
@@ -646,8 +895,37 @@ def infer(
         )
     )
 
-    # -- Compose the Problem. [V7, R-6, N-13, N-16]
-    identity = store.allocator.new_object()
+    # -- Compose the Problem. [V7, R-6, N-13, N-16] Standalone mode
+    # allocates a fresh identity; versioned mode succeeds the predecessor
+    # (version = predecessor + 1, lineage_id constant, R-1/V11) so the
+    # successor is a new immutable version of the same logical object.
+    if predecessor_attributes is None:
+        identity = store.allocator.new_object()
+    else:
+        identity = store.allocator.succeed(predecessor_attributes.identity)
+    criteria = (
+        "S-4: 2 independent sources across supporting Facts",
+        "N-16: Tier 1 count derived from distinct independence "
+        "keys of the supporting Facts' Evidence",
+        "P-V5: inference_basis covers exactly the supporting set",
+        "P-V6: not a restatement of a single Fact (acceptance)",
+        "R-3: support from contributing Facts, bounded by their "
+        "confidence",
+    )
+    if predecessor_attributes is not None:
+        # Versioned mode: the chain verdict is part of the argument. [T04.1.2]
+        criteria = criteria + (
+            "P-I1: solution-independence verified across all versions of "
+            "the predecessor's lineage [T04.1.2]",
+            "R-1/V11: successor of the named predecessor",
+        )
+    reformulation_note = (
+        f"; supersedes {predecessor_id!r} (v{predecessor_attributes.version}) "
+        f"under R-1/V11, with solution-independence verified over every "
+        f"version of the lineage [P-I1, T04.1.2]"
+        if predecessor_attributes is not None
+        else ""
+    )
     attributes = UniversalAttributes(
         identity=identity,
         object_type=ObjectType.PROBLEM,
@@ -659,17 +937,10 @@ def infer(
         ),
         explanation=Explanation(
             objects_referenced=request.fact_refs,
-            criteria_applied=(
-                "S-4: 2 independent sources across supporting Facts",
-                "N-16: Tier 1 count derived from distinct independence "
-                "keys of the supporting Facts' Evidence",
-                "P-V5: inference_basis covers exactly the supporting set",
-                "P-V6: not a restatement of a single Fact (acceptance)",
-                "R-3: support from contributing Facts, bounded by their "
-                "confidence",
-            ),
+            criteria_applied=criteria,
             reasoning=(
-                f"Inferred the deficiency from "
+                f"{'Reformulated' if predecessor_attributes is not None else 'Inferred'} "
+                f"the deficiency from "
                 f"{len(request.fact_refs)} supporting Fact(s) "
                 f"{list(request.fact_refs)} attested by "
                 f"{independent_source_count} independent source(s) "
@@ -679,10 +950,10 @@ def infer(
                 f"support and source diversity, bounded by their "
                 f"confidence; assertion confidence "
                 f"{float(request.inference_confidence):.2f} as supplied "
-                f"by the inferer. Severity and frequency are free text: "
-                f"no scales exist yet (M-12 open, bands at T04.1.4); "
-                f"problem_domain is unconstrained (M-21 open, taxonomy "
-                f"at T04.1.6)"
+                f"by the inferer{reformulation_note}. Severity and "
+                f"frequency are free text: no scales exist yet (M-12 "
+                f"open, bands at T04.1.4); problem_domain is "
+                f"unconstrained (M-21 open, taxonomy at T04.1.6)"
             ),
         ),
         evidence_reachable=True,
@@ -718,18 +989,78 @@ def infer(
     # lineage index, the graph, or the Problem registry. P-V1..P-V6 and
     # the universal rules are authoritative here -- including P-V6's
     # two restatement prongs and P-V1's re-check of the declared count.
-    try:
-        stored = store.write_problem(problem)
-    except WriteRejectedError as rejection:
-        failure = _failure(
-            request, InferenceStage.STORE_REJECTED,
-            "ACCEPTANCE_REFUSED",
-            f"the acceptance path refused the inference: "
-            f"{', '.join(rejection.failure.rule_ids)} -- "
-            f"{rejection.failure.object_id} [P-V1..P-V6 authoritative]",
-            log, now,
-        )
-        raise _refuse(failure) from rejection
+    #
+    # Versioned mode (T04.1.2) follows the extraction merge recipe
+    # exactly: the authoritative PROBLEM_RULES dry-run has already closed
+    # the type-rule failure surface BEFORE any state change; the
+    # predecessor is transitioned ACTIVE -> SUPERSEDED (I5 permits only
+    # one ACTIVE version, and R-2 makes SUPERSEDED terminal, so the
+    # transition must precede the write); the successor is then persisted
+    # with its predecessor. A transition failure leaves the predecessor
+    # unchanged (nothing was mutated). Should the write still fail -- the
+    # universal-rule residual argued closed by construction -- the
+    # refusal names the exact surviving state: predecessor SUPERSEDED
+    # with every attribute and payload intact, no successor, the store's
+    # acceptance failure retained. Data intact, auditable, nothing
+    # silent. [R-2, N-10, extraction merge precedent]
+    if predecessor_id is None:
+        try:
+            stored = store.write_problem(problem)
+        except WriteRejectedError as rejection:
+            failure = _failure(
+                request, InferenceStage.STORE_REJECTED,
+                "ACCEPTANCE_REFUSED",
+                f"the acceptance path refused the inference: "
+                f"{', '.join(rejection.failure.rule_ids)} -- "
+                f"{rejection.failure.object_id} [P-V1..P-V6 authoritative]",
+                log, now,
+            )
+            raise _refuse(failure) from rejection
+    else:
+        _dry_run_problem_rules(request, problem, store, log, now)
+        try:
+            store.transition(
+                predecessor_id, ObjectStatus.SUPERSEDED,
+                "reformulated: successor inferred [T04.1.2, R-1/V11]",
+            )
+        except Exception as exc:
+            # The store mutated nothing on a failed transition; the
+            # predecessor is unchanged. [N-10]
+            failure = _failure(
+                request, InferenceStage.STORE_REJECTED,
+                "PREDECESSOR_TRANSITION_FAILED",
+                f"the predecessor {predecessor_id!r} could not be "
+                f"superseded; no state has changed (the predecessor is "
+                f"unchanged): {type(exc).__name__}: {exc} [T04.1.2, N-10]",
+                log, now,
+            )
+            raise _refuse(failure) from exc
+        try:
+            stored = store.write_problem(
+                problem, predecessor_id=predecessor_id
+            )
+        except StoreError as rejection:  # WriteRejectedError included
+            # SUPERSEDED is terminal under R-2: restoration is
+            # structurally impossible, exactly as the extraction merge
+            # precedent argues. The refusal names the surviving state.
+            rule_ids = (
+                ", ".join(rejection.failure.rule_ids)
+                if isinstance(rejection, WriteRejectedError)
+                else type(rejection).__name__
+            )
+            failure = _failure(
+                request, InferenceStage.STORE_REJECTED,
+                "WRITE_FAILED_AFTER_TRANSITION",
+                f"the successor write failed after the predecessor was "
+                f"superseded: {rule_ids}. The predecessor "
+                f"{predecessor_id!r} is SUPERSEDED (terminal under R-2) "
+                f"and holds every attribute and payload it had; no "
+                f"successor exists; the store retains its failure record "
+                f"-- data intact, fully auditable, nothing silent "
+                f"[R-2, N-10, T04.1.2]",
+                log, now,
+            )
+            raise _refuse(failure) from rejection
 
     persisted = store.get_problem(stored.object_id)
     if persisted is None:
@@ -754,4 +1085,5 @@ def infer(
         source_type_count=len(source_types),
         evidential_support=evidential_support,
         assertion_confidence=float(request.inference_confidence),
+        predecessor_id=predecessor_id,
     )
