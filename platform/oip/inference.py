@@ -1,7 +1,8 @@
-"""Problem inference: Facts judged to indicate a deficiency. [T04.1.1, T04.1.2]
+"""Problem inference: Facts judged to indicate a deficiency. [T04.1.1, T04.1.2, T04.1.3]
 
 Task: T04.1.1 (standalone inference), T04.1.2 (solution-independence
-enforcement across versions)
+enforcement across versions), T04.1.3 (affected-population
+identification: P-I3 enforcement at the versioned-write boundary)
 
 Architecture References:
 - S-4    Problem sufficiency floor: 2 independent sources across the
@@ -56,6 +57,18 @@ Architecture References:
          lexical definition), and a chain never becomes acceptable
          merely because its newest version is clean. P-V2 at acceptance
          and ProblemIntegrity's P-I1 re-check remain authoritative.
+- P-V3/
+  P-I3    Affected-population identification. [T04.1.3] P-V3 (non-empty,
+         non-generic) remains authoritative at request construction and
+         acceptance -- the engine adds no duplicate. P-I3 (population
+         never widened without supporting Facts) is enforced at the
+         versioned-write boundary with the authoritative
+         widens_population_of / adds_support_over -- no second widening
+         definition: every existing consecutive pair of the lineage, then
+         the predecessor -> successor pair, before any state changes.
+         Undecidable rewordings stay undecidable (S-3); the engine never
+         derives or widens a population (N-4); ProblemIntegrity's P-I3
+         re-check remains authoritative.
 - IOM    section 3.3 (Problem object); Master Reference section 4.6
          (engine responsibility and boundaries).
 
@@ -73,15 +86,16 @@ The versioned path (T04.1.2) adds reformulation: a new version of an
 existing Problem -- the IOM's "reformulation" versioning trigger --
 entering through the same acceptance, with the predecessor transitioned
 ACTIVE -> SUPERSEDED and solution-independence verified over the whole
-version chain before any state changes.
+version chain before any state changes. T04.1.3 extends the same gate to
+the population: a reformulation may widen the affected population only
+when it also brings additional supporting Facts (P-I3).
 
 Scope: the inference engine only. Severity/frequency bands (T04.1.4,
-M-12), population identification (T04.1.3), deduplication (T04.1.5,
-M-22) and taxonomy (T04.1.6, M-21) are deliberately absent. The engine
-never merges, never links DUPLICATES, never ranks weight, never
-constrains problem_domain, and never acquires evidence when support is
-insufficient -- it refuses (Master Reference 4.6 boundaries; OPEN
-QUESTION-11 stays open).
+M-12), deduplication (T04.1.5, M-22) and taxonomy (T04.1.6, M-21) are
+deliberately absent. The engine never merges, never links DUPLICATES,
+never ranks weight, never constrains problem_domain, and never acquires
+evidence when support is insufficient -- it refuses (Master Reference 4.6
+boundaries; OPEN QUESTION-11 stays open).
 """
 
 from __future__ import annotations
@@ -162,6 +176,8 @@ class InferenceStage(str, Enum):
     PREDECESSOR_NOT_A_PROBLEM = "PREDECESSOR_NOT_A_PROBLEM"
     PREDECESSOR_NOT_ACTIVE = "PREDECESSOR_NOT_ACTIVE"
     CHAIN_NOT_SOLUTION_INDEPENDENT = "CHAIN_NOT_SOLUTION_INDEPENDENT"
+    # T04.1.3: population widening without support. [P-I3, P-V3]
+    POPULATION_WIDENED_WITHOUT_SUPPORT = "POPULATION_WIDENED_WITHOUT_SUPPORT"
 
 
 # Stages at which the sufficiency judgement was actually evaluated against
@@ -176,11 +192,16 @@ class InferenceStage(str, Enum):
 # hand and the solution-independence judgement ran over every version.
 # The predecessor-resolution stages are not-attempted, like every other
 # input-resolution failure.
+#
+# POPULATION_WIDENED_WITHOUT_SUPPORT is attempted [T04.1.3]: both
+# populations and both support sets were in hand and the authoritative
+# P-I3 widening judgement ran.
 _ATTEMPTED_STAGES = frozenset(
     {
         InferenceStage.INSUFFICIENT_SOURCES,
         InferenceStage.STORE_REJECTED,
         InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT,
+        InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT,
     }
 )
 
@@ -667,6 +688,120 @@ def _check_chain_solution_independence(
         raise _refuse(failure)
 
 
+def _pi3_violation_of(earlier: Problem, later: Problem) -> str | None:
+    """The authoritative P-I3 widening violation between two versions, or
+    None. [T04.1.3]
+
+    Delegates entirely to Problem.widens_population_of /
+    Problem.adds_support_over -- the same public, ratified semantics the
+    detective ProblemIntegrity uses. No second definition of widening
+    exists here: undecidable rewordings return None (S-3), widening WITH
+    additional supporting Facts returns None (P-I3 satisfied), and only
+    unambiguous widening without support is reported.
+    """
+    if not later.widens_population_of(earlier):
+        return None
+    if later.adds_support_over(earlier):
+        return None
+    return (
+        f"affected population widened from "
+        f"{earlier.affected_population!r} to "
+        f"{later.affected_population!r} without additional supporting "
+        f"Facts"
+    )
+
+
+def _check_population_pi3_pairs(
+    request: InferenceRequest,
+    predecessor_id: str,
+    store: KnowledgeStore,
+    log: InferenceLog,
+    now: datetime,
+) -> None:
+    """P-I3 over every EXISTING consecutive pair of the predecessor's
+    lineage. [T04.1.3]
+
+    A clean latest version never bypasses an earlier population violation
+    (the T04.1.2 chain principle): if any already-stored consecutive pair
+    widened without additional supporting Facts, the lineage's P-I3
+    invariant is broken and no new version may extend it. Runs in the
+    versioned preamble, before any state change.
+    """
+    lineage_id = store.resolve_lineage(predecessor_id)
+    registered: list[Problem] = []
+    for version in store.versions_of(lineage_id):
+        payload = store.get_problem(version.object_id)
+        if payload is None:
+            # Unreachable: the P-I1 chain check walks this same
+            # enumeration first and refuses fail-closed (REGISTRY_GAP)
+            # on any missing payload. ProblemIntegrity remains the
+            # detective for registry gaps.
+            continue  # pragma: no cover - structural
+        registered.append(payload)
+
+    for earlier, later in zip(registered, registered[1:]):
+        violation = _pi3_violation_of(earlier, later)
+        if violation is not None:
+            failure = _failure(
+                request, InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT,
+                "PAIR_WIDENED_WITHOUT_SUPPORT",
+                f"the lineage already violates P-I3: v"
+                f"{earlier.attributes.version} -> v"
+                f"{later.attributes.version} of lineage {lineage_id!r} "
+                f"{violation}; a clean successor cannot make the chain "
+                f"acceptable, so the versioned inference is refused "
+                f"[P-I3, T04.1.3]",
+                log, now,
+            )
+            raise _refuse(failure)
+
+
+def _check_successor_population(
+    request: InferenceRequest,
+    predecessor_id: str,
+    successor: Problem,
+    store: KnowledgeStore,
+    log: InferenceLog,
+    now: datetime,
+) -> None:
+    """P-I3 for the proposed pair: predecessor -> composed successor.
+    [T04.1.3]
+
+    Runs after composition and BEFORE the predecessor transition, so a
+    refusal leaves the predecessor ACTIVE with no successor stored. The
+    verdict is the authoritative P-I3 semantics verbatim: widening with
+    additional supporting Facts is the IOM's sanctioned population
+    revision; widening without it is refused; equal, narrowing, and
+    undecidably-different populations all pass (the engine never
+    guesses, S-3).
+    """
+    predecessor = store.get_problem(predecessor_id)
+    if predecessor is None:  # pragma: no cover - structural
+        # Unreachable: the predecessor resolved and is ACTIVE
+        # (_resolve_predecessor), and the P-I1 chain check refused
+        # fail-closed had its payload been missing.
+        failure = _failure(
+            request, InferenceStage.STORE_REJECTED, "REGISTRY_GAP",
+            f"predecessor {predecessor_id!r} has no Problem payload; the "
+            f"P-I3 population comparison cannot run, so the versioned "
+            f"inference is refused [T04.1.3]",
+            log, now,
+        )
+        raise _refuse(failure)
+
+    violation = _pi3_violation_of(predecessor, successor)
+    if violation is not None:
+        failure = _failure(
+            request, InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT,
+            "SUCCESSOR_WIDENS_WITHOUT_SUPPORT",
+            f"the proposed successor {violation}; population revision "
+            f"requires the additional supporting Facts that justify it "
+            f"[P-I3, T04.1.3]",
+            log, now,
+        )
+        raise _refuse(failure)
+
+
 def _dry_run_problem_rules(
     request: InferenceRequest,
     problem: Problem,
@@ -755,13 +890,18 @@ def infer(
     # -- T04.1.2 versioned mode preamble. No state changes on any refusal
     # here: the predecessor is resolved, type-checked, eligibility-checked,
     # and its whole version chain verified solution-independent [P-I1]
-    # before the shared gates run.
+    # before the shared gates run. T04.1.3 adds the P-I3 pairs check:
+    # every existing consecutive pair of the lineage must already satisfy
+    # population-never-widened-without-support.
     predecessor_attributes: UniversalAttributes | None = None
     if predecessor_id is not None:
         predecessor_attributes = _resolve_predecessor(
             request, predecessor_id, store, log, now
         )
         _check_chain_solution_independence(
+            request, predecessor_id, store, log, now
+        )
+        _check_population_pi3_pairs(
             request, predecessor_id, store, log, now
         )
 
@@ -917,6 +1057,8 @@ def infer(
         criteria = criteria + (
             "P-I1: solution-independence verified across all versions of "
             "the predecessor's lineage [T04.1.2]",
+            "P-I3: population never widened without additional supporting "
+            "Facts, across the whole lineage and the successor [T04.1.3]",
             "R-1/V11: successor of the named predecessor",
         )
     reformulation_note = (
@@ -982,6 +1124,15 @@ def infer(
         problem_persistence=request.problem_persistence,
         cost_indication=request.cost_indication,
     )
+
+    # -- T04.1.3 population gate for the NEW pair: predecessor ->
+    # successor, with the authoritative P-I3 semantics, BEFORE any state
+    # change. A refusal here leaves the predecessor ACTIVE and nothing
+    # written. [P-I3, P-V3]
+    if predecessor_id is not None:
+        _check_successor_population(
+            request, predecessor_id, problem, store, log, now
+        )
 
     # -- Persistence: the acceptance path only, never the registry, the
     # graph, or store internals. [N-8, T01.7.3] write_problem is atomic:

@@ -1,7 +1,8 @@
 """Contract tests for the Problem Intelligence engine.
 
 Task: T04.1.1 (standalone inference), T04.1.2 (solution-independence
-enforcement across versions)
+enforcement across versions), T04.1.3 (affected-population
+identification: P-I3 enforcement at the versioned-write boundary)
 
 Architecture References:
 - S-4         Problem sufficiency: 2 independent sources across supporting
@@ -25,6 +26,13 @@ Architecture References:
              store.write_problem -- never duplicated in these tests
 - P-I1        Solution-independence across ALL versions of the chain;
              a clean successor never masks a violating earlier version
+- P-V3/P-I3   Affected-population identification. [T04.1.3] P-V3
+             (non-empty, non-generic) stays authoritative at request
+             construction and acceptance; P-I3 (population never widened
+             without additional supporting Facts) is enforced at the
+             versioned-write boundary with the authoritative
+             widens_population_of / adds_support_over -- no second
+             widening definition, undecidable rewordings never guessed
 
 Acceptance criteria under test:
   AC1  sufficiency threshold enforced (S-4 floor, independence-grouped)
@@ -33,10 +41,13 @@ Acceptance criteria under test:
   T04.1.2  the versioned path: reformulation supersedes the predecessor,
        and solution-independence is enforced over every existing version
        of the chain before any state changes
+  T04.1.3  population identification: the population is carried exactly
+       (N-4), and a versioned inference may widen it only with
+       additional supporting Facts (P-I3), across the whole lineage and
+       the proposed successor, before any state changes
 
 Explicitly NOT under test here (later tasks): severity/frequency bands
-(T04.1.4), population identification (T04.1.3), deduplication (T04.1.5),
-taxonomy (T04.1.6).
+(T04.1.4), deduplication (T04.1.5), taxonomy (T04.1.6).
 """
 
 from __future__ import annotations
@@ -1976,3 +1987,526 @@ class TestVersionedScopeBoundaries:
             store=store, log=InferenceLog(), predecessor_id=v1.object_id,
         ).problem
         assert v2.problem_domain == "Another unregulated domain entirely"
+
+
+# ---------------------------------------------------------------------------
+# T04.1.3 -- affected-population identification (P-I3 at the write boundary)
+# ---------------------------------------------------------------------------
+#
+# P-V3 (non-empty, non-generic) stays where it already is: request
+# construction and the authoritative acceptance rules. What T04.1.3 adds
+# is the P-I3 gate on the versioned path: widening the population (or
+# raising its size estimate) without additional supporting Facts refuses
+# the inference BEFORE any state changes -- for the proposed successor
+# AND for every existing consecutive pair of the lineage. The verdicts
+# below all come from the authoritative widens_population_of /
+# adds_support_over; violating pairs enter lineages the same way the
+# P-I1/P-I3 integrity tests do, by post-write mutation.
+
+NARROW_POPULATION = (
+    "Segment A sellers maintaining inventories above 50 active listings"
+)
+WIDER_POPULATION = "Segment A sellers"  # NARROW minus qualifying terms
+REWORDED_POPULATION = (
+    "High-volume marketplace merchants operating in the EU region"
+)  # neither a superset nor a subset: undecidable, never guessed [S-3]
+
+
+class TestPopulationPv3Regression:
+    """AC1 unchanged: P-V3 remains the request/acceptance authority."""
+
+    def test_specific_population_succeeds_both_paths(self, store, allocator):
+        """#2 A specific, non-empty population is accepted standalone and
+        versioned."""
+        a, b = two_independent_facts(store, allocator)
+        standalone = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        )
+        assert standalone.problem.affected_population == NARROW_POPULATION
+        versioned = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT, population=NARROW_POPULATION,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=standalone.object_id,
+        )
+        assert versioned.problem.affected_population == NARROW_POPULATION
+
+    def test_generic_population_refused_standalone(self, store, allocator):
+        """#3 Generic descriptors never reach the store."""
+        a, b = two_independent_facts(store, allocator)
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(a.object_id, b.object_id, population="everyone"),
+                store=store, log=log,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert "P-V3" in failure.detail
+
+    def test_generic_population_refused_versioned(self, store, allocator):
+        """#3 The versioned dry-run refuses a generic successor before the
+        transition (T04.1.2 machinery, unchanged)."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(request_over(a.object_id, b.object_id), store=store, log=InferenceLog()).problem
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population="all users",
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.STORE_REJECTED
+        assert "P-V3" in failure.detail
+        assert store.find(v1.object_id).status is ObjectStatus.ACTIVE
+
+    @pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+    def test_empty_population_refused_at_request(self, store, allocator, blank):
+        """#4 An absent population is not a request (N-4)."""
+        a, b = two_independent_facts(store, allocator)
+        with pytest.raises(InferenceError, match="affected_population"):
+            request_over(a.object_id, b.object_id, population=blank)
+
+
+class TestPopulationWideningGate:
+    """AC2: the successor pair gate (P-I3, authoritative semantics)."""
+
+    def test_term_drop_widening_without_support_refused(self, store, allocator):
+        """#5 Dropping qualifying terms broadens the population; without a
+        new Fact the versioned inference is refused."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population=WIDER_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT
+        assert failure.reason == "SUCCESSOR_WIDENS_WITHOUT_SUPPORT"
+
+    def test_refusal_names_both_populations(self, store, allocator):
+        """#6 The refusal identifies the population it came from and the
+        one it refused to widen to."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population=WIDER_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert NARROW_POPULATION in failure.detail
+        assert WIDER_POPULATION in failure.detail
+
+    def test_term_drop_widening_with_added_fact_succeeds(self, store, allocator):
+        """#7 Widening backed by an additional supporting Fact is the
+        IOM's sanctioned population revision."""
+        a, b = two_independent_facts(store, allocator)
+        c = write_fact_from(store, allocator, source_identifier="src-gamma")
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id, c.object_id,
+                statement=V2_STATEMENT, population=WIDER_POPULATION,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.affected_population == WIDER_POPULATION
+        assert outcome.problem.attributes.version == 2
+        assert not [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I3"
+        ]
+
+    def test_raised_estimate_without_support_refused(self, store, allocator):
+        """#8 A raised population_size_estimate is numerical widening."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                population=NARROW_POPULATION, population_size_estimate=100,
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population=NARROW_POPULATION,
+                    population_size_estimate=9_000,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT
+
+    def test_raised_estimate_with_added_fact_succeeds(self, store, allocator):
+        """#9 The same raise, supported by a new Fact, is accepted -- the
+        authoritative P-I3 says the widening is justified."""
+        a, b = two_independent_facts(store, allocator)
+        c = write_fact_from(store, allocator, source_identifier="src-delta")
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                population=NARROW_POPULATION, population_size_estimate=100,
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id, c.object_id,
+                statement=V2_STATEMENT, population=NARROW_POPULATION,
+                population_size_estimate=9_000,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.population_size_estimate == 9_000
+
+    def test_undecidable_rewording_allowed(self, store, allocator):
+        """#10 A differently worded population is neither wider nor
+        narrower; the engine does not guess (S-3)."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT, population=REWORDED_POPULATION,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.affected_population == REWORDED_POPULATION
+
+    def test_narrowing_allowed(self, store, allocator):
+        """#11 Adding qualifying terms narrows the population -- always
+        legal without new Facts."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        narrower = NARROW_POPULATION + " with high dispute rates"
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT, population=narrower,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.affected_population == narrower
+
+    def test_equal_population_allowed(self, store, allocator):
+        """#12 Restating the same population is not widening."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT, population=NARROW_POPULATION,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.affected_population == NARROW_POPULATION
+        assert outcome.problem.attributes.version == 2
+
+
+class TestPopulationChainEnforcement:
+    """AC2, chain principle: an existing violating pair blocks the
+    lineage, however clean the latest version."""
+
+    def _lineage_with_violating_pair(self, store, allocator):
+        """v1 -> v2 clean at write time; v1's population is then narrowed
+        post-write so the stored pair v1 -> v2 now widens without
+        support (the same corruption vector the P-I1 tests use)."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT,
+                population=NARROW_POPULATION + " with high dispute rates",
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        object.__setattr__(
+            store.get_problem(v1.object_id),
+            "affected_population",
+            NARROW_POPULATION + " with high dispute rates and EU registration",
+        )
+        return a, b, v1, v2
+
+    def test_earlier_pair_violation_blocks_new_version(self, store, allocator):
+        """#13 The lineage's P-I3 invariant is already broken; no new
+        version may extend it."""
+        a, b, v1, v2 = self._lineage_with_violating_pair(store, allocator)
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V3_STATEMENT, population=WIDER_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v2.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT
+        assert failure.reason == "PAIR_WIDENED_WITHOUT_SUPPORT"
+
+    def test_clean_latest_does_not_bypass_earlier_violation(self, store, allocator):
+        """#14 The ACTIVE latest version is itself clean (the successor
+        would not widen IT); the refusal comes from the earlier pair and
+        names that pair."""
+        a, b, v1, v2 = self._lineage_with_violating_pair(store, allocator)
+        successor = request_over(
+            a.object_id, b.object_id,
+            statement=V3_STATEMENT,
+            population=NARROW_POPULATION + " with high dispute rates and EU registration",
+            synthesis="Together these Facts show the deficiency as stated.",
+        )
+        # the proposed successor does NOT widen v2 (its immediate
+        # predecessor): same population. The block is the stored pair.
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(successor, store=store, log=log, predecessor_id=v2.object_id)
+        failure = next(iter(log))
+        assert failure.reason == "PAIR_WIDENED_WITHOUT_SUPPORT"
+        assert v1.object_id in failure.detail or "v1" in failure.detail
+        assert store.find(v2.object_id).status is ObjectStatus.ACTIVE
+
+
+class TestPopulationAtomicity:
+    """A population refusal leaves no trace. [N-10, P-I3]"""
+
+    def _gate_refusal_state(self, store, allocator):
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population=WIDER_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        return v1, log
+
+    def test_predecessor_stays_active(self, store, allocator):
+        """#15 The gate runs before the transition."""
+        v1, _ = self._gate_refusal_state(store, allocator)
+        assert store.find(v1.object_id).status is ObjectStatus.ACTIVE
+        assert store.find(v1.object_id).attributes.status_reason is None
+
+    def test_no_successor_retained(self, store, allocator):
+        """#16 Nothing was written: one version, one registered Problem."""
+        v1, _ = self._gate_refusal_state(store, allocator)
+        lineage = v1.attributes.identity.lineage_id
+        assert len(store.versions_of(lineage)) == 1
+        assert len(store.problems) == 1
+
+    def test_no_partial_store_state(self, store, allocator):
+        """#17 Registry, versions and statuses are bit-for-bit unchanged
+        by the refusal."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        before = (
+            len(store.problems),
+            tuple(
+                (v.object_id, v.status) for v in store.versions_of(
+                    v1.attributes.identity.lineage_id
+                )
+            ),
+        )
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population=WIDER_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        after = (
+            len(store.problems),
+            tuple(
+                (v.object_id, v.status) for v in store.versions_of(
+                    v1.attributes.identity.lineage_id
+                )
+            ),
+        )
+        assert before == after
+
+
+class TestPopulationStageN10:
+    """The stage is deterministic and distinguishable. [N-10]"""
+
+    def test_stage_distinguishable_and_attempted(self, store, allocator):
+        """#18 Distinct from every neighbouring stage; the judgement ran
+        (attempted), unlike the resolution stages."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+            store=store, log=InferenceLog(),
+        ).problem
+        # A population refusal...
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population=WIDER_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        population_failure = next(iter(log))
+        # ...versus a chain refusal on the same lineage shape...
+        smuggle(store, v1.object_id, ABSENCE_STATEMENT)
+        log2 = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V3_STATEMENT, population=NARROW_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log2, predecessor_id=v1.object_id,
+            )
+        chain_failure = next(iter(log2))
+        assert population_failure.stage is not chain_failure.stage
+        assert population_failure.stage is InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT
+        assert population_failure.attempted is True
+
+    def test_refusal_deterministic_across_repetitions(self, store, allocator):
+        """#18 Identically-constructed scenarios produce identical
+        recorded refusals (fresh store per run, as succession allocates
+        once per predecessor)."""
+        details = []
+        for _ in range(3):
+            s = KnowledgeStore()
+            a, b = two_independent_facts(s, s.allocator)
+            v1 = infer(
+                request_over(a.object_id, b.object_id, population=NARROW_POPULATION),
+                store=s, log=InferenceLog(),
+            ).problem
+            log = InferenceLog()
+            with pytest.raises(InferenceRefusedError):
+                infer(
+                    request_over(
+                        a.object_id, b.object_id,
+                        statement=V2_STATEMENT, population=WIDER_POPULATION,
+                        synthesis="Together these Facts show the deficiency as stated.",
+                    ),
+                    store=s, log=log, predecessor_id=v1.object_id,
+                )
+            details.append(next(iter(log)).detail)
+        assert len(set(details)) == 1
+
+
+class TestPopulationScope:
+    """The engine identifies; it never derives, widens, or ranks."""
+
+    def test_population_carried_exactly_never_derived(self, store, allocator):
+        """#19 The successor carries the request's population and estimate
+        verbatim; the predecessor's are untouched; the engine contributed
+        no population content of its own."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                population=NARROW_POPULATION, population_size_estimate=120,
+                existing_workarounds="Manual CSV reconciliation",
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT,
+                population=NARROW_POPULATION + " with high dispute rates",
+                population_size_estimate=90,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.affected_population == NARROW_POPULATION + " with high dispute rates"
+        assert outcome.problem.population_size_estimate == 90
+        assert store.get_problem(v1.object_id).affected_population == NARROW_POPULATION
+        assert store.get_problem(v1.object_id).population_size_estimate == 120
+
+    def test_no_widening_semantics_beyond_the_authoritative_methods(self, store, allocator):
+        """Scope: the gate's verdict is exactly widens_population_of's
+        verdict -- a lowered estimate and a narrowed text both pass without
+        new Facts, and nothing else is consulted."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                population=NARROW_POPULATION, population_size_estimate=500,
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT,
+                population=NARROW_POPULATION + " with high dispute rates",
+                population_size_estimate=10,
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        )
+        assert outcome.problem.population_size_estimate == 10
+        assert outcome.problem.attributes.version == 2
