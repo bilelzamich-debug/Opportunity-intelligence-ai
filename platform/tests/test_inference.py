@@ -76,6 +76,13 @@ from oip.problem import (
     InferenceBasis,
     Problem,
     ProblemError,
+    WeightBand,
+    WeightContribution,
+    WeightCriterion,
+    WeightError,
+    WeightRating,
+    band_rank,
+    criterion_for,
 )
 from oip.store import KnowledgeStore, WriteRejectedError
 from oip.support import sufficiency_threshold
@@ -92,8 +99,8 @@ POPULATION = (
     "Segment A sellers maintaining inventories above approximately 50 "
     "active listings."
 )
-SEVERITY = "HIGH -- unnoticed loss reaches customers"
-FREQUENCY = "RECURRENT -- multiple reporting periods"
+SEVERITY_DETAIL = "unnoticed loss reaches customers"
+FREQUENCY_DETAIL = "multiple reporting periods"
 DOMAIN = "Marketplace inventory management"
 SYNTHESIS = (
     "Together these Facts show an unmet need for reliable batch "
@@ -116,17 +123,51 @@ def contributions(*refs: str) -> tuple[FactContribution, ...]:
     )
 
 
+def weight(
+    band: WeightBand,
+    refs,
+    detail: str = "evidenced by the cited Facts",
+) -> WeightRating:
+    """A WeightRating citing every ref under the band's own criterion.
+
+    The default test rating: the declared criterion is attested whenever
+    S-4 itself passes (all supporting Facts, hence all available
+    independence keys), so pre-T04.1.4 outcomes are preserved unless a
+    test deliberately varies the rating.
+    """
+    criterion = criterion_for(band)
+    return WeightRating(
+        band,
+        f"{band.value} -- {detail}",
+        tuple(
+            WeightContribution(ref, criterion, f"{ref} evidences {criterion.value}")
+            for ref in dict.fromkeys(refs)
+        ),
+    )
+
+
 def request_over(
     *refs: str,
     statement: str = STATEMENT,
     population: str = POPULATION,
-    severity: str = SEVERITY,
-    frequency: str = FREQUENCY,
+    severity: WeightRating | None = None,
+    frequency: WeightRating | None = None,
     domain: str = DOMAIN,
     synthesis: str = SYNTHESIS,
     confidence: float = 0.7,
     **overrides,
 ) -> InferenceRequest:
+    """Build a request over refs. Weight defaults: SEVERE severity and
+    RECURRING frequency, each citing EVERY ref under its own criterion,
+    so the declared criterion is attested whenever S-4 passes and
+    pre-T04.1.4 outcomes are preserved unless a test varies the rating.
+    [F-W1, T04.1.4]"""
+    if severity is None:
+        # No refs: a placeholder that never gets inspected -- the request
+        # refuses on fact_refs first (P-V1).
+        severity = weight(WeightBand.SEVERE, refs, SEVERITY_DETAIL) if refs else ""
+    if frequency is None:
+        frequency = weight(WeightBand.RECURRING, refs, FREQUENCY_DETAIL) if refs else ""
     kwargs = dict(
         fact_refs=tuple(refs),
         problem_statement=statement,
@@ -530,8 +571,8 @@ class TestInferenceBasisCoverage:
                 fact_refs=(a.object_id, b.object_id),
                 problem_statement=STATEMENT,
                 affected_population=POPULATION,
-                severity=SEVERITY,
-                frequency=FREQUENCY,
+                severity=weight(WeightBand.SEVERE, (a.object_id, b.object_id,), SEVERITY_DETAIL),
+                frequency=weight(WeightBand.RECURRING, (a.object_id, b.object_id,), FREQUENCY_DETAIL),
                 problem_domain=DOMAIN,
                 contributions=(
                     FactContribution(a.object_id, "establishes one part"),
@@ -548,8 +589,8 @@ class TestInferenceBasisCoverage:
                 fact_refs=(a.object_id, b.object_id),
                 problem_statement=STATEMENT,
                 affected_population=POPULATION,
-                severity=SEVERITY,
-                frequency=FREQUENCY,
+                severity=weight(WeightBand.SEVERE, (a.object_id, b.object_id,), SEVERITY_DETAIL),
+                frequency=weight(WeightBand.RECURRING, (a.object_id, b.object_id,), FREQUENCY_DETAIL),
                 problem_domain=DOMAIN,
                 contributions=(FactContribution(a.object_id, "only one"),),
                 synthesis=SYNTHESIS,
@@ -563,8 +604,8 @@ class TestInferenceBasisCoverage:
                 fact_refs=(a.object_id,),
                 problem_statement=STATEMENT,
                 affected_population=POPULATION,
-                severity=SEVERITY,
-                frequency=FREQUENCY,
+                severity=weight(WeightBand.SEVERE, (a.object_id,), SEVERITY_DETAIL),
+                frequency=weight(WeightBand.RECURRING, (a.object_id,), FREQUENCY_DETAIL),
                 problem_domain=DOMAIN,
                 contributions=(),
                 synthesis=SYNTHESIS,
@@ -578,8 +619,8 @@ class TestInferenceBasisCoverage:
                 fact_refs=(a.object_id, b.object_id),
                 problem_statement=STATEMENT,
                 affected_population=POPULATION,
-                severity=SEVERITY,
-                frequency=FREQUENCY,
+                severity=weight(WeightBand.SEVERE, (a.object_id, b.object_id,), SEVERITY_DETAIL),
+                frequency=weight(WeightBand.RECURRING, (a.object_id, b.object_id,), FREQUENCY_DETAIL),
                 problem_domain=DOMAIN,
                 contributions=(
                     FactContribution(a.object_id, "once"),
@@ -966,8 +1007,8 @@ class TestCreateAuthority:
                 problem_statement=STATEMENT,
                 affected_population=POPULATION,
                 supporting_facts=(a_id, b_id),
-                severity=SEVERITY,
-                frequency=FREQUENCY,
+                severity=weight(WeightBand.SEVERE, (a_id, b_id,), SEVERITY_DETAIL),
+                frequency=weight(WeightBand.RECURRING, (a_id, b_id,), FREQUENCY_DETAIL),
                 problem_domain=DOMAIN,
                 inference_basis=InferenceBasis(
                     contributions=contributions(a_id, b_id),
@@ -1951,23 +1992,45 @@ class TestVersionedScopeBoundaries:
         assert v2.affected_population == narrow
         assert v1.affected_population == POPULATION  # predecessor untouched
 
-    def test_no_severity_ranking(self, store, allocator):
-        """#32 Severity stays free text, carried unchanged, never
-        ordered or ranked (T04.1.4, M-12)."""
+    def test_severity_rating_carried_verbatim_across_versions(self, store, allocator):
+        """#32 Severity is the inferer's rating, carried unchanged; the
+        engine derives, orders nothing and adds nothing (N-4, F-W1
+        R3/R4, T04.1.4).
+
+        Supersedes test_no_severity_ranking, which asserted severity as
+        free text with no ordering. F-W1 ratified structured ordinal
+        ratings, so the free-text clause is gone; the N-4 verbatim-carry
+        clause is preserved and re-asserted here: a justification-only
+        revision (equal band, changed detail) versions freely, and each
+        version carries the exact rating the inferer supplied.
+        """
         a, b = two_independent_facts(store, allocator)
+        requested_v1 = weight(
+            WeightBand.SEVERE, (a.object_id, b.object_id),
+            "unnoticed loss reaches customers",
+        )
         v1 = infer(
-            request_over(a.object_id, b.object_id, severity="LOW -- minor friction"),
+            request_over(a.object_id, b.object_id, severity=requested_v1),
             store=store, log=InferenceLog(),
         ).problem
+        requested_v2 = weight(
+            WeightBand.SEVERE, (a.object_id, b.object_id),
+            "halting revenue for affected sellers",
+        )
         v2 = infer(
             request_over(
                 a.object_id, b.object_id,
-                statement=V2_STATEMENT, severity="CRITICAL -- revenue halting",
+                statement=V2_STATEMENT, severity=requested_v2,
             ),
             store=store, log=InferenceLog(), predecessor_id=v1.object_id,
         ).problem
-        assert v2.severity == "CRITICAL -- revenue halting"
-        assert v1.severity == "LOW -- minor friction"
+        assert v2.severity is requested_v2  # carried verbatim, N-4
+        assert v1.severity is requested_v1  # predecessor untouched
+        assert v2.severity.band is WeightBand.SEVERE
+        assert v2.severity.detail == requested_v2.detail
+        assert v2.severity.cited_facts == requested_v2.cited_facts
+        # No engine-derived ranking: the ordinal lives in the shared
+        # ratified band model, never in a per-Problem derived field.
         assert not hasattr(v2, "severity_rank")
 
     def test_no_taxonomy_constraints(self, store, allocator):
@@ -2510,3 +2573,608 @@ class TestPopulationScope:
         )
         assert outcome.problem.population_size_estimate == 10
         assert outcome.problem.attributes.version == 2
+
+
+# ===========================================================================
+# T04.1.4 -- F-W1 weight gates at the inference boundary  [C, E, F, G]
+# ===========================================================================
+
+class TestWeightCeilingGate:
+    """The D-B evidence ceiling, before any state change. [F-W1 R4]
+
+    Facts establish an evidence ceiling; they do not determine the
+    asserted weight. A criterion is defensible iff its entries cite Facts
+    spanning >= 2 independence keys -- S-4's floor value, uniform for
+    every band: a sufficiency condition, never a classifier, never a
+    ladder.
+    """
+
+    def test_exactly_two_keys_carry_the_heaviest_bands(self, store, allocator):
+        """Sufficiency is uniform: the heaviest bands need no more than
+        the floor, and the floor is enough for them."""
+        a, b = two_independent_facts(store, allocator)
+        outcome = infer(
+            request_over(a.object_id, b.object_id), store=store, log=InferenceLog(),
+        )
+        assert outcome.problem.severity.band is WeightBand.SEVERE
+        assert outcome.problem.frequency.band is WeightBand.RECURRING
+        assert store.get_problem(outcome.object_id) is not None
+
+    def test_uncorroborated_severity_refused(self, store, allocator):
+        """SEVERE declared by entries citing only one Fact: 1 key, and the
+        refusal names the span."""
+        a, b = two_independent_facts(store, allocator)
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    severity=weight(WeightBand.SEVERE, (a.object_id,)),
+                ),
+                store=store, log=log,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.WEIGHT_EXCEEDS_EVIDENCE
+        assert failure.reason == "CRITERION_NOT_ATTESTED"
+        assert failure.attempted is True
+        assert "1 independence key" in failure.detail
+        assert "IRREVERSIBLE_HARM" in failure.detail
+
+    def test_uncorroborated_frequency_refused(self, store, allocator):
+        a, b = two_independent_facts(store, allocator)
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    frequency=weight(WeightBand.PERSISTENT, (a.object_id,)),
+                ),
+                store=store, log=log,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.WEIGHT_EXCEEDS_EVIDENCE
+        assert failure.reason == "CRITERION_NOT_ATTESTED"
+        assert "frequency" in failure.detail
+
+    def test_severity_judged_before_frequency(self, store, allocator):
+        """Both axes over-claim: the record reports severity, the first
+        axis, matching P-I4's order."""
+        a, b = two_independent_facts(store, allocator)
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    severity=weight(WeightBand.SEVERE, (a.object_id,)),
+                    frequency=weight(WeightBand.PERSISTENT, (a.object_id,)),
+                ),
+                store=store, log=log,
+            )
+        failure = next(iter(log))
+        assert failure.reason == "CRITERION_NOT_ATTESTED"
+        assert failure.detail.startswith("severity")
+
+    def test_undeclared_band_criterion_refused(self, store, allocator):
+        """Form-valid (axis-coherent) entries that never declare the
+        asserted band's own criterion: no evidence-linked backing."""
+        a, b = two_independent_facts(store, allocator)
+        rating = WeightRating(
+            WeightBand.SEVERE, "SEVERE -- asserted",
+            (
+                WeightContribution(a.object_id, WeightCriterion.COMPOUNDING_COST, "cost"),
+                WeightContribution(b.object_id, WeightCriterion.COMPOUNDING_COST, "cost"),
+            ),
+        )
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(a.object_id, b.object_id, severity=rating),
+                store=store, log=log,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.WEIGHT_EXCEEDS_EVIDENCE
+        assert failure.reason == "CRITERION_NOT_DECLARED"
+        assert "IRREVERSIBLE_HARM" in failure.detail
+
+    def test_surplus_keys_never_raise_or_demand(self, store, allocator):
+        """Counts never select a band: with 4 keys available, SEVERE
+        citing exactly 2 passes and stays SEVERE; MINOR citing 2 passes
+        and stays MINOR. More sources do not mean more weight."""
+        facts = tuple(
+            write_fact_from(store, allocator, source_identifier=f"src-{i}")
+            for i in range(4)
+        )
+        refs = tuple(f.object_id for f in facts)
+        heavy = infer(
+            request_over(
+                *refs, severity=weight(WeightBand.SEVERE, refs[:2]),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        assert heavy.severity.band is WeightBand.SEVERE  # not raised
+        light = infer(
+            request_over(
+                *refs, severity=weight(WeightBand.MINOR, refs[:2]),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        assert light.severity.band is WeightBand.MINOR  # never upgraded
+
+    def test_below_ceiling_never_flagged_never_upgraded(self, store, allocator):
+        """MINOR over two keys is an under-assertion, not a violation:
+        the engine never upgrades an inferer's rating."""
+        a, b = two_independent_facts(store, allocator)
+        outcome = infer(
+            request_over(
+                a.object_id, b.object_id,
+                severity=weight(WeightBand.MINOR, (a.object_id, b.object_id)),
+                frequency=weight(WeightBand.EPISODIC, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        )
+        assert outcome.problem.severity.band is WeightBand.MINOR
+        assert outcome.problem.frequency.band is WeightBand.EPISODIC
+
+    def test_ceiling_refusal_is_atomic(self, store, allocator):
+        """The gate runs before composition and before any state change:
+        nothing is written, nothing partial remains."""
+        a, b = two_independent_facts(store, allocator)
+        object_census = lambda s: tuple(
+            len(s.objects_of_type(t)) for t in ObjectType
+        )
+        before = (len(store.problems), object_census(store))
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    severity=weight(WeightBand.SEVERE, (a.object_id,)),
+                ),
+                store=store, log=log,
+            )
+        assert (len(store.problems), object_census(store)) == before
+        assert log.by_stage()[InferenceStage.WEIGHT_EXCEEDS_EVIDENCE] == 1
+
+    def test_ceiling_stage_distinguishable_and_attempted(self, store, allocator):
+        """N-10: a distinct, attempted stage -- unlike the S-4 refusal on
+        the same inputs, which is a different judgement."""
+        a, b = two_independent_facts(store, allocator)
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    severity=weight(WeightBand.SEVERE, (a.object_id,)),
+                ),
+                store=store, log=log,
+            )
+        weight_failure = next(iter(log))
+        # A genuine S-4 refusal on the same shape: one Fact's Evidence
+        # superseded, so one key remains. A different judgement, a
+        # different stage.
+        store.transition(
+            b.attachments[0].evidence_ref, ObjectStatus.SUPERSEDED, "re-acquired"
+        )
+        log2 = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(a.object_id, b.object_id),
+                store=store, log=log2,
+            )
+        s4_failure = next(iter(log2))
+        assert s4_failure.stage is InferenceStage.INSUFFICIENT_SOURCES
+        assert weight_failure.stage is not s4_failure.stage
+        assert weight_failure.stage is InferenceStage.WEIGHT_EXCEEDS_EVIDENCE
+        assert weight_failure.attempted is True
+        assert set(weight_failure.fact_refs) == {a.object_id, b.object_id}
+
+
+class TestWeightVersionedGate:
+    """F-W1 R5: a versioned band increase requires at least one NEW
+    supporting Fact cited by the raised rating. [T04.1.4]
+
+    Decreases and justification-only revisions version freely; the
+    predecessor stays ACTIVE on every refusal.
+    """
+
+    def _v1(self, store, allocator, **overrides):
+        a, b = two_independent_facts(store, allocator)
+        return a, b, infer(
+            request_over(a.object_id, b.object_id, **overrides),
+            store=store, log=InferenceLog(),
+        ).problem
+
+    def test_increase_with_new_cited_fact_accepted(self, store, allocator):
+        """The sanctioned heavier version: the raised rating cites a Fact
+        the predecessor did not rest on."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        c = write_fact_from(store, allocator, source_identifier="src-gamma")
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id, c.object_id,
+                statement=V2_STATEMENT,
+                severity=weight(WeightBand.SEVERE, (a.object_id, c.object_id)),
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        assert v2.severity.band is WeightBand.SEVERE
+        assert v2.attributes.version == 2
+        assert store.get_problem(v1.object_id) is not None  # predecessor intact
+
+    def test_increase_without_new_support_refused(self, store, allocator):
+        """Heavier band over the SAME Facts: refused, predecessor stays
+        ACTIVE, nothing written."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT,
+                    severity=weight(WeightBand.SEVERE, (a.object_id, b.object_id)),
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.WEIGHT_INCREASED_WITHOUT_SUPPORT
+        assert failure.reason == "NO_ADDITIONAL_SUPPORTING_FACT"
+        assert failure.attempted is True
+        assert failure.detail.startswith("the successor raises severity")
+        assert store.find(v1.object_id).status is ObjectStatus.ACTIVE
+        assert len(store.problems) == 1
+        lineage = v1.attributes.identity.lineage_id
+        assert len(store.versions_of(lineage)) == 1
+
+    def test_increase_citing_only_old_facts_refused(self, store, allocator):
+        """The new Fact is carried by the request but NOT cited by the
+        raised rating: support must be CITED, not merely present. The
+        F-W1 R5 requirement is an evidence-linked justification, not a
+        payload count."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        c = write_fact_from(store, allocator, source_identifier="src-gamma")
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id, c.object_id,
+                    statement=V2_STATEMENT,
+                    severity=weight(WeightBand.SEVERE, (a.object_id, b.object_id)),
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.WEIGHT_INCREASED_WITHOUT_SUPPORT
+        assert store.find(v1.object_id).status is ObjectStatus.ACTIVE
+
+    def test_decrease_is_free(self, store, allocator):
+        """A lighter band over the same Facts versions without any new
+        support: decreases were never gated."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id),  # SEVERE / RECURRING
+            store=store, log=InferenceLog(),
+        ).problem
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT,
+                severity=weight(WeightBand.MINOR, (a.object_id, b.object_id)),
+                frequency=weight(WeightBand.EPISODIC, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        assert v2.severity.band is WeightBand.MINOR
+        assert v2.frequency.band is WeightBand.EPISODIC
+
+    def test_justification_only_frequency_revision_is_free(self, store, allocator):
+        """Equal band, changed justification: a justification-only
+        revision, not an increase."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(a.object_id, b.object_id),
+            store=store, log=InferenceLog(),
+        ).problem
+        new_frequency = WeightRating(
+            WeightBand.RECURRING, "RECURRING -- now evidenced differently",
+            (
+                WeightContribution(a.object_id, WeightCriterion.REPETITION, "again"),
+                WeightContribution(b.object_id, WeightCriterion.REPETITION, "again"),
+            ),
+        )
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                statement=V2_STATEMENT, frequency=new_frequency,
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        assert v2.frequency is new_frequency
+        assert v2.frequency.band is v1.frequency.band
+
+    def test_frequency_increase_needs_new_support(self, store, allocator):
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                frequency=weight(WeightBand.RECURRING, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT,
+                    frequency=weight(WeightBand.PERSISTENT, (a.object_id, b.object_id)),
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.WEIGHT_INCREASED_WITHOUT_SUPPORT
+        assert failure.detail.startswith("the successor raises frequency")
+
+    def test_axes_gated_independently(self, store, allocator):
+        """Severity's increase is justified by a new cited Fact; the
+        frequency increase is not: the version is refused for frequency
+        alone."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        c = write_fact_from(store, allocator, source_identifier="src-gamma")
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id, c.object_id,
+                    statement=V2_STATEMENT,
+                    severity=weight(WeightBand.SEVERE, (a.object_id, c.object_id)),
+                    frequency=weight(WeightBand.PERSISTENT, (a.object_id, b.object_id)),
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        failure = next(iter(log))
+        assert failure.stage is InferenceStage.WEIGHT_INCREASED_WITHOUT_SUPPORT
+        assert failure.detail.startswith("the successor raises frequency")
+
+    def test_widening_and_raising_satisfied_by_one_new_fact(self, store, allocator):
+        """P-I3 and F-W1 R5 in one version: a wider population AND both
+        raised bands, all justified by the same new supporting Fact."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                population=NARROW_POPULATION,
+                severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+                frequency=weight(WeightBand.RECURRING, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        c = write_fact_from(store, allocator, source_identifier="src-gamma")
+        v2 = infer(
+            request_over(
+                a.object_id, b.object_id, c.object_id,
+                statement=V2_STATEMENT,
+                population=WIDER_POPULATION,
+                severity=weight(WeightBand.SEVERE, (a.object_id, c.object_id)),
+                frequency=weight(WeightBand.PERSISTENT, (b.object_id, c.object_id)),
+                synthesis="Together these Facts show the deficiency as stated.",
+            ),
+            store=store, log=InferenceLog(), predecessor_id=v1.object_id,
+        ).problem
+        assert v2.severity.band is WeightBand.SEVERE
+        assert v2.frequency.band is WeightBand.PERSISTENT
+        assert v2.affected_population == WIDER_POPULATION
+
+    def test_versioned_weight_refusal_leaves_no_partial_state(
+        self, store, allocator
+    ):
+        """Bit-for-bit: registry, versions and statuses unchanged by the
+        refusal."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        before = (
+            len(store.problems),
+            tuple(
+                (v.object_id, v.status)
+                for v in store.versions_of(v1.attributes.identity.lineage_id)
+            ),
+        )
+        log = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT,
+                    severity=weight(WeightBand.SEVERE, (a.object_id, b.object_id)),
+                ),
+                store=store, log=log, predecessor_id=v1.object_id,
+            )
+        after = (
+            len(store.problems),
+            tuple(
+                (v.object_id, v.status)
+                for v in store.versions_of(v1.attributes.identity.lineage_id)
+            ),
+        )
+        assert before == after
+
+    def test_weight_stages_distinguishable_from_population_stage(
+        self, store, allocator
+    ):
+        """N-10: the two T04.1.4 stages are distinct from each other and
+        from the T04.1.3 population stage on the same lineage shape."""
+        a, b = two_independent_facts(store, allocator)
+        v1 = infer(
+            request_over(
+                a.object_id, b.object_id,
+                population=NARROW_POPULATION,
+                severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        # population refusal (widening, no new Facts; its default SEVERE
+        # severity would also fail R5, but the population gate refuses
+        # first -- order is part of what this test pins)
+        log_p = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    statement=V2_STATEMENT, population=WIDER_POPULATION,
+                    synthesis="Together these Facts show the deficiency as stated.",
+                ),
+                store=store, log=log_p, predecessor_id=v1.object_id,
+            )
+        # ceiling refusal (standalone, same facts)
+        log_c = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    severity=weight(WeightBand.SEVERE, (a.object_id,)),
+                ),
+                store=store, log=log_c,
+            )
+        # versioned new-support refusal. A fresh store: a refused
+        # post-composition versioned attempt has already consumed this
+        # lineage's allocator succession (identity is allocated at
+        # composition, before the gates -- pre-existing T04.1.3
+        # behaviour, deliberately unchanged), and chains may not branch.
+        s2 = KnowledgeStore()
+        c, d = two_independent_facts(s2, s2.allocator)
+        w1 = infer(
+            request_over(
+                c.object_id, d.object_id,
+                severity=weight(WeightBand.MODERATE, (c.object_id, d.object_id)),
+            ),
+            store=s2, log=InferenceLog(),
+        ).problem
+        log_v = InferenceLog()
+        with pytest.raises(InferenceRefusedError):
+            infer(
+                request_over(
+                    c.object_id, d.object_id,
+                    statement=V3_STATEMENT,
+                    severity=weight(WeightBand.SEVERE, (c.object_id, d.object_id)),
+                ),
+                store=s2, log=log_v, predecessor_id=w1.object_id,
+            )
+        p = next(iter(log_p))
+        c = next(iter(log_c))
+        v = next(iter(log_v))
+        assert len({p.stage, c.stage, v.stage}) == 3
+        assert c.stage is InferenceStage.WEIGHT_EXCEEDS_EVIDENCE
+        assert v.stage is InferenceStage.WEIGHT_INCREASED_WITHOUT_SUPPORT
+        assert all(f.attempted for f in (p, c, v))
+
+    def test_refusal_deterministic_across_repetitions(self, store, allocator):
+        """Identically-constructed scenarios produce identical recorded
+        refusals (fresh store per run, as succession allocates once per
+        predecessor)."""
+        details = []
+        for _ in range(3):
+            s = KnowledgeStore()
+            a, b = two_independent_facts(s, s.allocator)
+            v1 = infer(
+                request_over(
+                    a.object_id, b.object_id,
+                    severity=weight(WeightBand.MODERATE, (a.object_id, b.object_id)),
+                ),
+                store=s, log=InferenceLog(),
+            ).problem
+            log = InferenceLog()
+            with pytest.raises(InferenceRefusedError):
+                infer(
+                    request_over(
+                        a.object_id, b.object_id,
+                        statement=V2_STATEMENT,
+                        severity=weight(WeightBand.SEVERE, (a.object_id, b.object_id)),
+                    ),
+                    store=s, log=log, predecessor_id=v1.object_id,
+                )
+            details.append(next(iter(log)).detail)
+        assert len(set(details)) == 1
+
+
+class TestWeightRequestBoundary:
+    """Structured ratings are a request-level requirement. [P-V4, F-W1 R3]"""
+
+    def test_string_weight_rejected_at_construction(self, store, allocator):
+        a, b = two_independent_facts(store, allocator)
+        with pytest.raises(InferenceError, match="required as a WeightRating"):
+            request_over(a.object_id, b.object_id, severity="HIGH -- prose")
+        with pytest.raises(InferenceError, match="required as a WeightRating"):
+            request_over(a.object_id, b.object_id, frequency="RECURRENT -- prose")
+
+    def test_phantom_weight_citation_rejected_at_construction(self, store, allocator):
+        """A rating may cite no Fact outside the supporting set: held at
+        the boundary, never persisted."""
+        a, b = two_independent_facts(store, allocator)
+        with pytest.raises(InferenceError, match="do not support the hypothesis"):
+            request_over(
+                a.object_id, b.object_id,
+                severity=weight(WeightBand.SEVERE, (a.object_id, "obj-phantom")),
+            )
+        with pytest.raises(InferenceError, match="do not support the hypothesis"):
+            request_over(
+                a.object_id, b.object_id,
+                frequency=weight(WeightBand.PERSISTENT, ("obj-phantom",)),
+            )
+
+    def test_rating_travels_to_the_persisted_problem(self, store, allocator):
+        """The engine carries the inferer's ratings verbatim, deriving
+        nothing: band, detail and citations all survive the write."""
+        a, b = two_independent_facts(store, allocator)
+        severity = weight(
+            WeightBand.MODERATE, (a.object_id, b.object_id), "compounding costs"
+        )
+        frequency = weight(
+            WeightBand.EPISODIC, (a.object_id, b.object_id), "one-off occurrence"
+        )
+        problem = infer(
+            request_over(
+                a.object_id, b.object_id, severity=severity, frequency=frequency,
+            ),
+            store=store, log=InferenceLog(),
+        ).problem
+        assert problem.severity is severity
+        assert problem.frequency is frequency
+        assert problem.severity.cited_facts == frozenset(
+            {a.object_id, b.object_id}
+        )

@@ -2,7 +2,9 @@
 
 Task: T04.1.1 (standalone inference), T04.1.2 (solution-independence
 enforcement across versions), T04.1.3 (affected-population
-identification: P-I3 enforcement at the versioned-write boundary)
+identification: P-I3 enforcement at the versioned-write boundary),
+T04.1.4 (severity/frequency ordinal bands: the F-W1 weight model at
+the inference boundary)
 
 Architecture References:
 - S-4    Problem sufficiency floor: 2 independent sources across the
@@ -69,6 +71,24 @@ Architecture References:
          Undecidable rewordings stay undecidable (S-3); the engine never
          derives or widens a population (N-4); ProblemIntegrity's P-I3
          re-check remains authoritative.
+- F-W1/
+  P-I4   Ratified weight model (T04.1.4): severity and frequency are
+         structured WeightRatings (MINOR/MODERATE/SEVERE,
+         EPISODIC/RECURRING/PERSISTENT) with evidence-linked
+         justification entries. The engine enforces the D-B evidence
+         ceiling before any state change: a criterion is defensible
+         iff its entries cite Facts spanning >= 2 independence keys
+         (S-4's floor value, uniform across bands -- a sufficiency
+         condition, never a classifier, never a ladder), and a
+         rating above the ceiling is refused. On the versioned path
+         an increased band additionally requires at least one NEW
+         supporting Fact cited by the rating. The engine never
+         derives a band, never upgrades, never ranks: Facts
+         establish an evidence ceiling, they do not determine the
+         asserted weight [F-W1 R1-R5]. No NLP/LLM/network --
+         declaration fidelity is the inferer's responsibility,
+         audited by F-A1 [M-67 open, N-4]. ProblemIntegrity's P-I4
+         re-check remains authoritative.
 - IOM    section 3.3 (Problem object); Master Reference section 4.6
          (engine responsibility and boundaries).
 
@@ -88,14 +108,18 @@ entering through the same acceptance, with the predecessor transitioned
 ACTIVE -> SUPERSEDED and solution-independence verified over the whole
 version chain before any state changes. T04.1.3 extends the same gate to
 the population: a reformulation may widen the affected population only
-when it also brings additional supporting Facts (P-I3).
+when it also brings additional supporting Facts (P-I3). T04.1.4 adds
+the F-W1 weight gates: the evidence ceiling for every rating, and the
+new-support requirement for a versioned band increase.
 
-Scope: the inference engine only. Severity/frequency bands (T04.1.4,
-M-12), deduplication (T04.1.5, M-22) and taxonomy (T04.1.6, M-21) are
-deliberately absent. The engine never merges, never links DUPLICATES,
-never ranks weight, never constrains problem_domain, and never acquires
-evidence when support is insufficient -- it refuses (Master Reference 4.6
-boundaries; OPEN QUESTION-11 stays open).
+Scope: the inference engine only. Deduplication (T04.1.5, M-22) and
+taxonomy (T04.1.6, M-21) are deliberately absent. Weight itself is
+INFERER-SUPPLIED (N-4): the engine bounds it -- the ratified bands
+with their evidence ceiling (F-W1, T04.1.4) -- but never derives a
+band, never upgrades one, never ranks problems by weight, never merges,
+never links DUPLICATES, never constrains problem_domain, and never
+acquires evidence when support is insufficient -- it refuses (Master
+Reference 4.6 boundaries; OPEN QUESTION-11 stays open).
 """
 
 from __future__ import annotations
@@ -125,9 +149,14 @@ from oip.contract import (
 from oip.fact import Fact
 from oip.problem import (
     PROBLEM_RULES,
+    WEIGHT_ATTESTATION_FLOOR,
     FactContribution,
     InferenceBasis,
     Problem,
+    WeightBand,
+    WeightRating,
+    band_rank,
+    criterion_for,
     detect_solution_language,
 )
 from oip.store import KnowledgeStore, StoreError, WriteRejectedError
@@ -178,6 +207,9 @@ class InferenceStage(str, Enum):
     CHAIN_NOT_SOLUTION_INDEPENDENT = "CHAIN_NOT_SOLUTION_INDEPENDENT"
     # T04.1.3: population widening without support. [P-I3, P-V3]
     POPULATION_WIDENED_WITHOUT_SUPPORT = "POPULATION_WIDENED_WITHOUT_SUPPORT"
+    # T04.1.4: F-W1 weight gates. [P-V4, P-I4, F-W1 R4/R5]
+    WEIGHT_EXCEEDS_EVIDENCE = "WEIGHT_EXCEEDS_EVIDENCE"
+    WEIGHT_INCREASED_WITHOUT_SUPPORT = "WEIGHT_INCREASED_WITHOUT_SUPPORT"
 
 
 # Stages at which the sufficiency judgement was actually evaluated against
@@ -196,12 +228,18 @@ class InferenceStage(str, Enum):
 # POPULATION_WIDENED_WITHOUT_SUPPORT is attempted [T04.1.3]: both
 # populations and both support sets were in hand and the authoritative
 # P-I3 widening judgement ran.
+#
+# The T04.1.4 weight stages are attempted [F-W1]: the ratings, the
+# Facts and their Evidence were in hand and the authoritative
+# evidence-ceiling / new-support judgements ran.
 _ATTEMPTED_STAGES = frozenset(
     {
         InferenceStage.INSUFFICIENT_SOURCES,
         InferenceStage.STORE_REJECTED,
         InferenceStage.CHAIN_NOT_SOLUTION_INDEPENDENT,
         InferenceStage.POPULATION_WIDENED_WITHOUT_SUPPORT,
+        InferenceStage.WEIGHT_EXCEEDS_EVIDENCE,
+        InferenceStage.WEIGHT_INCREASED_WITHOUT_SUPPORT,
     }
 )
 
@@ -366,9 +404,13 @@ class InferenceRequest:
     certainty. The engine contributes no content of its own -- its work
     is to hold this hypothesis against the store's evidence. [N-4]
 
-    Severity and frequency are free text: no scales exist (M-12 open,
-    bands land at T04.1.4). problem_domain is free text: no taxonomy
-    exists (M-21 open, lands at T04.1.6). The basis must cover exactly
+    Severity and frequency are structured WeightRatings (F-W1, T04.1.4):
+    the inferer asserts one ratified band per axis, preserves free-text
+    detail, and justifies the band with typed per-Fact entries. The
+    engine bounds these ratings against the evidence ceiling -- it
+    never derives, upgrades or ranks them (N-4; population scales
+    remain open, M-12 partially closed). problem_domain is free text:
+    no taxonomy exists (M-21 open, lands at T04.1.6). The basis must cover exactly
     the supporting set: every supporting Fact represented, nothing else
     (P-V5; the engine enforces coverage, the type and the acceptance
     path re-check the rest).
@@ -377,8 +419,8 @@ class InferenceRequest:
     fact_refs: tuple[str, ...]
     problem_statement: str
     affected_population: str
-    severity: str
-    frequency: str
+    severity: WeightRating
+    frequency: WeightRating
     problem_domain: str
     contributions: tuple[FactContribution, ...]
     synthesis: str
@@ -407,8 +449,6 @@ class InferenceRequest:
         for name in (
             "problem_statement",
             "affected_population",
-            "severity",
-            "frequency",
             "problem_domain",
             "synthesis",
         ):
@@ -419,6 +459,30 @@ class InferenceRequest:
                 "inference_basis contributions are required; a Problem "
                 "needs an argument, not just a statement [P-V5]"
             )
+        # F-W1 R3: each axis is a structured WeightRating whose
+        # construction already guarantees a ratified band, non-empty
+        # detail and a typed, axis-coherent, duplicate-free
+        # justification. The request adds the coverage rule: a rating
+        # may cite no Fact outside the supporting set (the P-V5
+        # phantom rule applied to weight). Attestation is checked
+        # against the store, not here: it needs the Evidence beneath
+        # the Facts.
+        for name, rating in (("severity", self.severity),
+                             ("frequency", self.frequency)):
+            if not isinstance(rating, WeightRating):
+                raise InferenceError(
+                    f"{name} is required as a WeightRating (band, "
+                    f"detail, evidence-linked justification) "
+                    f"[N-4, P-V4, F-W1 R3]"
+                )
+            weight_phantom = sorted(
+                rating.cited_facts - set(self.fact_refs)
+            )
+            if weight_phantom:
+                raise InferenceError(
+                    f"{name} rating cites {weight_phantom}, which do "
+                    f"not support the hypothesis [P-V5, F-W1 R3]"
+                )
         # Exact coverage: every supporting Fact represented, no Fact
         # outside the supporting set represented. The InferenceBasis type
         # enforces the phantom and duplicate rules at composition; the
@@ -802,6 +866,131 @@ def _check_successor_population(
         raise _refuse(failure)
 
 
+def _check_weight_ceiling(
+    request: InferenceRequest,
+    fact_keys: dict[str, set[str]],
+    log: InferenceLog,
+    now: datetime,
+) -> None:
+    """The F-W1 D-B evidence ceiling for both ratings. [T04.1.4, P-I4]
+
+    Runs after the S-4 sufficiency judgement and BEFORE the Problem is
+    composed and any state changes, so a refusal leaves the store
+    untouched. Severity is judged before frequency, matching P-I4's
+    order.
+
+    Facts establish an evidence ceiling; they do not automatically
+    determine the asserted weight [F-W1 R4]. A criterion is defensible
+    iff the rating's entries declaring it cite Facts spanning at least
+    WEIGHT_ATTESTATION_FLOOR independence keys -- S-4's floor value,
+    IDENTICAL for every band: a sufficiency condition, never a
+    classifier, never a ladder. More independent sources do not mean
+    more weight: a rating at or below the ceiling passes regardless of
+    how many keys are available, and a rating whose declared criterion
+    is defensible is never refused for lack of OTHER criteria's keys.
+
+    The asserted band's own criterion must be declared (CRITERION_NOT_
+    DECLARED) and attested (CRITERION_NOT_ATTESTED). No comparison with
+    the predecessor happens here -- that is the R5 new-support gate, a
+    separate judgement.
+    """
+    for axis, rating in (
+        ("severity", request.severity),
+        ("frequency", request.frequency),
+    ):
+        criterion = criterion_for(rating.band)
+        cited = rating.facts_for(criterion)
+        if not cited:
+            failure = _failure(
+                request, InferenceStage.WEIGHT_EXCEEDS_EVIDENCE,
+                "CRITERION_NOT_DECLARED",
+                f"{axis} asserts {rating.band.value} but no justification "
+                f"entry declares {criterion.value}; the rating has no "
+                f"evidence-linked backing and the evidence ceiling does "
+                f"not carry it [F-W1 R4, T04.1.4]",
+                log, now,
+            )
+            raise _refuse(failure)
+        span: set[str] = set()
+        for fact_ref in cited:
+            span |= fact_keys.get(fact_ref, frozenset())
+        if len(span) < WEIGHT_ATTESTATION_FLOOR:
+            failure = _failure(
+                request, InferenceStage.WEIGHT_EXCEEDS_EVIDENCE,
+                "CRITERION_NOT_ATTESTED",
+                f"{axis} {rating.band.value} rests on {criterion.value} "
+                f"but its cited Fact(s) span only {len(span)} "
+                f"independence key(s) {sorted(span)}; at least "
+                f"{WEIGHT_ATTESTATION_FLOOR} are required, uniformly for "
+                f"every band -- an uncorroborated weight claim is one "
+                f"source's opinion [F-W1 R4, S-4, T04.1.4]",
+                log, now,
+            )
+            raise _refuse(failure)
+
+
+def _check_successor_weight(
+    request: InferenceRequest,
+    predecessor_id: str,
+    successor: Problem,
+    store: KnowledgeStore,
+    log: InferenceLog,
+    now: datetime,
+) -> None:
+    """F-W1 R5 for the proposed pair: no versioned band increase without
+    at least one NEW supporting Fact cited by the raised rating.
+    [T04.1.4]
+
+    Runs after _check_successor_population and BEFORE the predecessor
+    transition, so a refusal leaves the predecessor ACTIVE with no
+    successor stored. Decreases and equal-band revisions (including
+    justification-only changes) pass freely: only an INCREASE -- a higher
+    band on an axis -- demands the additional support that justifies it,
+    and that support must be cited by the rating whose band rose, not
+    merely carried by the request. The F-W1 R5 conditions (a) within
+    ceiling and (b) explicit higher-criterion justification are enforced
+    upstream: the shared ceiling gate ran at request time, and (b) is
+    structural -- the raised band's criterion is declared by the rating
+    itself.
+    """
+    predecessor = store.get_problem(predecessor_id)
+    if predecessor is None:  # pragma: no cover - structural
+        # Unreachable: the predecessor resolved and is ACTIVE
+        # (_resolve_predecessor), and the P-I1 chain check refused
+        # fail-closed had its payload been missing.
+        failure = _failure(
+            request, InferenceStage.STORE_REJECTED, "REGISTRY_GAP",
+            f"predecessor {predecessor_id!r} has no Problem payload; the "
+            f"F-W1 R5 weight comparison cannot run, so the versioned "
+            f"inference is refused [T04.1.4]",
+            log, now,
+        )
+        raise _refuse(failure)
+
+    raised = successor.increases_weight_over(predecessor)
+    if not raised:
+        return
+    new_facts = set(successor.supporting_facts) - set(
+        predecessor.supporting_facts
+    )
+    for axis in raised:
+        rating = getattr(successor, axis)
+        criterion = criterion_for(rating.band)
+        if not (rating.facts_for(criterion) & new_facts):
+            failure = _failure(
+                request, InferenceStage.WEIGHT_INCREASED_WITHOUT_SUPPORT,
+                "NO_ADDITIONAL_SUPPORTING_FACT",
+                f"the successor raises {axis} to {rating.band.value} but "
+                f"no justification entry declaring {criterion.value} "
+                f"cites a supporting Fact the predecessor did not rest "
+                f"on; a heavier rating requires at least one new "
+                f"supporting Fact cited by that rating [F-W1 R5, "
+                f"T04.1.4]",
+                log, now,
+            )
+            raise _refuse(failure)
+
+
 def _dry_run_problem_rules(
     request: InferenceRequest,
     problem: Problem,
@@ -961,7 +1150,14 @@ def infer(
     independence_keys: set[str] = set()
     source_types: set[str] = set()
     evidence_refs: list[str] = []
+    # Per-Fact independence keys, for the F-W1 weight attestation: the
+    # same resolution semantics as the global set (ACTIVE Evidence only,
+    # so the span may fall, never be inflated), kept per supporting Fact
+    # so a weight rating's ceiling is judged from the Facts IT cites.
+    # [F-W1 R4, T04.1.4]
+    fact_keys: dict[str, set[str]] = {}
     for fact in resolved:
+        keys_of_fact: set[str] = set()
         for attachment in fact.attachments:
             evidence_refs.append(attachment.evidence_ref)
             evidence = store.evidence.get(attachment.evidence_ref)
@@ -980,7 +1176,9 @@ def infer(
             if ev_stored is None or ev_stored.status is not ObjectStatus.ACTIVE:
                 continue
             independence_keys.add(evidence.independence_key)
+            keys_of_fact.add(evidence.independence_key)
             source_types.add(evidence.provenance.source_type)
+        fact_keys[fact.object_id] = keys_of_fact
 
     # -- The S-4 sufficiency judgement. Distinct independence keys across
     # the supporting Facts' Evidence; a floor, not a gradient. Exactly 2
@@ -1000,6 +1198,13 @@ def infer(
             log, now,
         )
         raise _refuse(failure)
+
+    # -- T04.1.4: the F-W1 evidence ceiling for both weight ratings,
+    # before the Problem is composed and before any state change: a
+    # rating above the ceiling is refused here, and the refusal leaves
+    # nothing written. Severity is judged before frequency, matching
+    # P-I4's order. [F-W1 R4, P-I4]
+    _check_weight_ceiling(request, fact_keys, log, now)
 
     # -- Temporal consistency: the Problem observes what its Facts
     # observed, no later. V8 (observed_at <= asserted_at <= produced_at)
@@ -1051,6 +1256,9 @@ def infer(
         "P-V6: not a restatement of a single Fact (acceptance)",
         "R-3: support from contributing Facts, bounded by their "
         "confidence",
+        "F-W1: severity and frequency asserted within the evidence "
+        "ceiling (declared criterion attested by >= 2 independence "
+        "keys) [T04.1.4]",
     )
     if predecessor_attributes is not None:
         # Versioned mode: the chain verdict is part of the argument. [T04.1.2]
@@ -1059,6 +1267,8 @@ def infer(
             "the predecessor's lineage [T04.1.2]",
             "P-I3: population never widened without additional supporting "
             "Facts, across the whole lineage and the successor [T04.1.3]",
+            "F-W1 R5: raised weight band justified by at least one new "
+            "supporting Fact cited by the rating [T04.1.4]",
             "R-1/V11: successor of the named predecessor",
         )
     reformulation_note = (
@@ -1093,8 +1303,12 @@ def infer(
                 f"confidence; assertion confidence "
                 f"{float(request.inference_confidence):.2f} as supplied "
                 f"by the inferer{reformulation_note}. Severity and "
-                f"frequency are free text: no scales exist yet (M-12 "
-                f"open, bands at T04.1.4); problem_domain is "
+                f"frequency are the inferer's F-W1 ordinal ratings "
+                f"(severity {request.severity.band.value}, frequency "
+                f"{request.frequency.band.value}), asserted within the "
+                f"evidence ceiling and never derived or upgraded by the "
+                f"engine (F-W1, T04.1.4; population scales remain open, "
+                f"M-12 partially closed); problem_domain is "
                 f"unconstrained (M-21 open, taxonomy at T04.1.6)"
             ),
         ),
@@ -1131,6 +1345,13 @@ def infer(
     # written. [P-I3, P-V3]
     if predecessor_id is not None:
         _check_successor_population(
+            request, predecessor_id, problem, store, log, now
+        )
+        # -- T04.1.4: F-W1 R5 -- a raised band needs at least one NEW
+        # supporting Fact cited by the raised rating. Same atomicity as
+        # the population gate: a refusal leaves the predecessor ACTIVE
+        # and nothing written. [F-W1 R5]
+        _check_successor_weight(
             request, predecessor_id, problem, store, log, now
         )
 

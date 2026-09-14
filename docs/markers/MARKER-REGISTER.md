@@ -16,7 +16,7 @@ Canonical authority: **PKP v2 §11** (contradictions), **§12** (open questions)
 
 | Category | Total | Closed | Partially closed | Open |
 |---|---|---|---|---|
-| Missing definitions (`M-nn`) | 70 | 23 | 4 | 43 |
+| Missing definitions (`M-nn`) | 70 | 23 | 5 | 42 |
 | Open questions (`OQ-nn`) | 24 | 8 | 0 | 16 |
 | Contradictions (`C-nn`) | 8 | 4 | 1 | 3 |
 
@@ -91,6 +91,7 @@ R-8 `Closes | C-04 (jointly with AD-05)`.
 | **M-36** | Failure *representation* | **Policy** — retry / skip / halt / compensate | **N-10** |
 | **M-67** | Sampled fidelity verification | Unsampled hallucinations still reach production | **S-5** |
 | **C-04** | Lineage path to self-reinforcement | **Behavioural** path → M-70 | **R-8** + **AD-05** |
+| **M-12** | Severity and frequency ordinal scales — bands with observable criteria, `WeightRating` representation, declared-criterion evidence ceiling, versioned-increase rule (F-W1 WD-1–WD-5) | **Population scales** — `population_size_estimate` remains unscaled; `affected_population` remains free text | **F-W1** |
 
 ### Reserved identifier
 
@@ -115,7 +116,7 @@ ratification of N-21. **Zero backlog acceptance criteria depend on it.**
 | Marker | Gap |
 |---|---|
 | M-19 | What qualifies as a fact; extraction granularity |
-| M-12 | Problem attributes — severity, frequency, population scales |
+| M-12 (population) | Population scales — severity/frequency ordinal bands partially closed by **F-W1** |
 | M-21 | Problem taxonomy |
 | M-22 | Problem identity and deduplication |
 | M-13 | Pattern temporal validity |
@@ -180,7 +181,7 @@ in production code that fails closed:
 
 | # | Gap | Marker |
 |---|---|---|
-| 1 | Severity / frequency scales | M-12 |
+| 1 | Severity / frequency scales | M-12 *(partially closed by F-W1 — severity/frequency scales; population scales remain open)* |
 | 2 | Scoring dimensions | M-14 |
 | 3 | Per-type pattern thresholds | M-24 / M-25 |
 | 4 | Validation method vocabulary | M-32 |

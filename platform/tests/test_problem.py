@@ -46,9 +46,19 @@ from oip.problem import (
     Problem,
     ProblemError,
     ProblemIntegrity,
+    SEVERITY_BANDS,
+    FREQUENCY_BANDS,
+    WEIGHT_ATTESTATION_FLOOR,
     SolutionSmugglingError,
     SupportingFactError,
+    WeightBand,
+    WeightContribution,
+    WeightCriterion,
     WeightError,
+    WeightRating,
+    band_of,
+    band_rank,
+    criterion_for,
     detect_solution_language,
     is_generic_population,
     pv1_supporting_facts_sufficient,
@@ -96,6 +106,28 @@ def basis(*fact_refs: str, synthesis: str | None = None) -> InferenceBasis:
     )
 
 
+def weight(
+    band: WeightBand,
+    refs,
+    detail: str = "evidenced by the cited Facts",
+) -> WeightRating:
+    """A WeightRating citing every ref under the band's own criterion.
+
+    The default test rating: the declared criterion is attested whenever
+    the cited Facts carry two independence keys, so default problems sit
+    within the F-W1 evidence ceiling.
+    """
+    criterion = criterion_for(band)
+    return WeightRating(
+        band,
+        f"{band.value} -- {detail}",
+        tuple(
+            WeightContribution(ref, criterion, f"{ref} evidences {criterion.value}")
+            for ref in dict.fromkeys(refs)
+        ),
+    )
+
+
 def make_problem(
     allocator: IdentityAllocator,
     fact_refs: tuple[str, ...] = ("obj-fa-1", "obj-fa-2"),
@@ -121,13 +153,22 @@ def make_problem(
         assertion=assertion,
         upstream_ceiling=upstream_ceiling,
     )
+    # F-W1 defaults: each axis cites every supporting Fact under the
+    # band's own criterion, so the default Problem sits within the
+    # evidence ceiling whenever its Facts carry two independence keys.
+    severity = overrides.pop(
+        "severity", weight(WeightBand.SEVERE, supports, "unnoticed loss reaches customers")
+    )
+    frequency = overrides.pop(
+        "frequency", weight(WeightBand.RECURRING, supports, "multiple periods")
+    )
     kwargs = {
         "attributes": attributes,
         "problem_statement": overrides.pop("problem_statement", STATEMENT),
         "affected_population": overrides.pop("affected_population", POPULATION),
         "supporting_facts": overrides.pop("supporting_facts", supports),
-        "severity": overrides.pop("severity", "HIGH -- unnoticed loss reaches customers"),
-        "frequency": overrides.pop("frequency", "RECURRENT -- multiple periods"),
+        "severity": severity,
+        "frequency": frequency,
         "problem_domain": overrides.pop(
             "problem_domain", "Marketplace inventory management"
         ),
@@ -498,9 +539,20 @@ class TestWeight:
         result = pv4_weight_present(ctx(make_problem(allocator)))
         assert result.outcome is RuleOutcome.PASS
 
-    def test_no_scale_is_asserted(self, allocator):
-        """M-12: severity/frequency bands land at T04.1.4, not here."""
-        assert "M-12" in pv4_weight_present(ctx(make_problem(allocator))).detail
+    def test_scale_is_the_ratified_f_w1_model(self, allocator):
+        """The scale is F-W1's ratified band model, and P-V4 names it.
+
+        Supersedes test_no_scale_is_asserted, which asserted no scale
+        existed ("bands land at T04.1.4, not here"). The bands HAVE
+        landed: F-W1 (T04.1.4) ratified the severity and frequency
+        ordinal bands. The M-12 reference is preserved -- the marker
+        stays partially closed because population scales remain open --
+        and P-V4's PASS detail still cites it.
+        """
+        result = pv4_weight_present(ctx(make_problem(allocator)))
+        assert result.outcome is RuleOutcome.PASS
+        assert "F-W1" in result.detail
+        assert "M-12" in result.detail  # partially closed, still cited
 
     @pytest.mark.parametrize("field_name", ["severity", "frequency"])
     def test_pv4_detects_a_stripped_component(self, allocator, field_name):
@@ -510,9 +562,36 @@ class TestWeight:
         assert result.failed
         assert field_name in result.detail
 
-    def test_arbitrary_severity_text_is_accepted(self, allocator):
-        """No taxonomy exists yet, so no value may be rejected for its wording."""
-        assert make_problem(allocator, severity="catastrophic-ish").severity
+    def test_arbitrary_band_wording_is_rejected(self, allocator):
+        """The bands are a closed set; free wording lives in the detail.
+
+        Supersedes test_arbitrary_severity_text_is_accepted, which
+        asserted arbitrary severity wording must be accepted because no
+        taxonomy existed. F-W1 (T04.1.4) ratified a CLOSED band set:
+        arbitrary band wording is now rejected at rating construction,
+        while arbitrary explanatory wording is preserved -- in the
+        rating's detail field, exactly where the free-text model carried
+        it.
+        """
+        with pytest.raises(WeightError, match="not a ratified WeightBand"):
+            WeightRating(
+                "catastrophic-ish",  # type: ignore[arg-type]
+                "catastrophic-ish -- wording the ratification never defined",
+                (WeightContribution(
+                    "obj-fa-1",
+                    WeightCriterion.IRREVERSIBLE_HARM,
+                    "the Fact evidences irreversible harm",
+                ),),
+            )
+        # the free wording survives, in the detail, under a ratified band
+        problem = make_problem(
+            allocator,
+            severity=weight(
+                WeightBand.SEVERE, ("obj-fa-1", "obj-fa-2"),
+                "catastrophic-ish, in the inferer's own words",
+            ),
+        )
+        assert "catastrophic-ish" in problem.severity.detail
 
 
 # ===========================================================================
@@ -1000,14 +1079,48 @@ class TestProblemIntegrity:
             for v in store.problems.integrity().verify()
         )
 
-    def test_pi4_does_not_rank_severity(self, store, allocator, facts):
-        """M-12: no scale exists, so no ordering may be asserted."""
-        stored = write_problem_from(store, allocator, facts, severity="EXTREME")
+    def test_pi4_enforces_the_evidence_ceiling_not_a_ranking(
+        self, store, allocator, facts
+    ):
+        """F-W1 R4 Example 1, both halves.
+
+        Supersedes test_pi4_does_not_rank_severity, which asserted no
+        ordering could exist because no scale existed (M-12). F-W1
+        (T04.1.4) ratified the ordinal bands, and P-I4 now enforces the
+        ratified D-B evidence ceiling: a criterion is defensible iff its
+        entries cite Facts spanning >= 2 independence keys. What P-I4
+        still never does is rank or derive: the asserted band is the
+        inferer's (N-4), and a rating AT or BELOW the ceiling is never
+        flagged, no matter how many keys are available.
+        """
+        refs = tuple(f.object_id for f in facts)
+        # (a) SEVERE citing both Facts: 2 independence keys, defensible,
+        # no violation -- the heaviest band passes with exactly the
+        # floor.
+        stored = write_problem_from(
+            store, allocator, facts,
+            severity=weight(WeightBand.SEVERE, refs),
+        )
         assert not [
             v for v in store.problems.integrity().verify()
             if v.constraint_id == "P-I4"
         ]
-        assert store.get_problem(stored.object_id).severity == "EXTREME"
+        assert (
+            store.get_problem(stored.object_id).severity.band
+            is WeightBand.SEVERE
+        )
+        # (b) SEVERE citing one Fact: 1 key, uncorroborated -- P-I4
+        # flags the rating the evidence ceiling does not carry.
+        single = write_problem_from(
+            store, allocator, facts,
+            severity=weight(WeightBand.SEVERE, refs[:1]),
+        )
+        assert [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+            and v.object_id == single.object_id
+            and "1 independence key" in v.detail
+        ]
 
     def test_pi4_silent_when_no_fact_resolves(self, store, allocator, facts):
         """P-I2 owns broken references; P-I4 must not double-report them."""
@@ -1384,3 +1497,381 @@ def test_dropping_qualifying_terms_always_widens(dropped):
     )
     assert later.widens_population_of(earlier)
     assert not earlier.widens_population_of(later)
+
+
+# ===========================================================================
+# T04.1.4 -- F-W1 weight model: bands, criteria, ratings  [A, B]
+# ===========================================================================
+
+class TestWeightModel:
+    """The ratified band model: two closed axes, one bijection. [F-W1 R1/R2]"""
+
+    def test_bands_form_two_disjoint_closed_axes(self):
+        assert SEVERITY_BANDS == frozenset(
+            {WeightBand.MINOR, WeightBand.MODERATE, WeightBand.SEVERE}
+        )
+        assert FREQUENCY_BANDS == frozenset(
+            {WeightBand.EPISODIC, WeightBand.RECURRING, WeightBand.PERSISTENT}
+        )
+        assert not (SEVERITY_BANDS & FREQUENCY_BANDS)
+        assert len(SEVERITY_BANDS | FREQUENCY_BANDS) == len(WeightBand) == 6
+
+    def test_band_criterion_bijection(self):
+        """Every band maps to exactly one criterion, and back. [F-W1 R1/R2]"""
+        pairs = (
+            (WeightBand.MINOR, WeightCriterion.RECOVERABLE_FRICTION),
+            (WeightBand.MODERATE, WeightCriterion.COMPOUNDING_COST),
+            (WeightBand.SEVERE, WeightCriterion.IRREVERSIBLE_HARM),
+            (WeightBand.EPISODIC, WeightCriterion.OCCURRENCE),
+            (WeightBand.RECURRING, WeightCriterion.REPETITION),
+            (WeightBand.PERSISTENT, WeightCriterion.CONTINUITY),
+        )
+        for band, criterion in pairs:
+            assert criterion_for(band) is criterion
+            assert band_of(criterion) is band
+
+    def test_rank_orders_within_an_axis_only(self):
+        """The ordinal exists to recognise a versioned INCREASE, never to
+        select a band; and the two axes are never compared to each other
+        (ranks are axis-local: MINOR and EPISODIC both sit at 0)."""
+        assert band_rank(WeightBand.MINOR) < band_rank(WeightBand.MODERATE)
+        assert band_rank(WeightBand.MODERATE) < band_rank(WeightBand.SEVERE)
+        assert band_rank(WeightBand.EPISODIC) < band_rank(WeightBand.RECURRING)
+        assert band_rank(WeightBand.RECURRING) < band_rank(WeightBand.PERSISTENT)
+        assert band_rank(WeightBand.MINOR) == band_rank(WeightBand.EPISODIC)
+
+    def test_attestation_floor_is_the_s4_floor(self):
+        """The sufficiency condition is S-4's own value, uniform for every
+        band: 2 independence keys, never a gradient, never a ladder."""
+        assert WEIGHT_ATTESTATION_FLOOR == 2
+        assert WEIGHT_ATTESTATION_FLOOR == sufficiency_threshold(ObjectType.PROBLEM)
+
+    def test_contribution_form_rules(self):
+        with pytest.raises(WeightError, match="must name the Fact"):
+            WeightContribution("  ", WeightCriterion.CONTINUITY, "text")
+        with pytest.raises(WeightError, match="not a ratified WeightCriterion"):
+            WeightContribution("obj-fa-1", "OFTEN", "text")  # type: ignore[arg-type]
+        with pytest.raises(WeightError, match="empty"):
+            WeightContribution("obj-fa-1", WeightCriterion.CONTINUITY, "  ")
+
+    def test_rating_form_rules(self):
+        refs = ("obj-fa-1", "obj-fa-2")
+        with pytest.raises(WeightError, match="not a ratified WeightBand"):
+            WeightRating("CATASTROPHIC", "d", tuple(  # type: ignore[arg-type]
+                WeightContribution(r, WeightCriterion.IRREVERSIBLE_HARM, "x")
+                for r in refs
+            ))
+        with pytest.raises(WeightError, match="detail is required"):
+            WeightRating(  # direct construction: the helper prefixes the band
+                WeightBand.SEVERE, "  ",
+                (WeightContribution(r, WeightCriterion.IRREVERSIBLE_HARM, "x")
+                 for r in refs),
+            )
+        with pytest.raises(WeightError, match="justification is required"):
+            WeightRating(WeightBand.SEVERE, "d", ())
+        with pytest.raises(WeightError, match="criterion mismatch"):
+            WeightRating(
+                WeightBand.SEVERE, "d",
+                (WeightContribution(r, WeightCriterion.CONTINUITY, "x") for r in refs),
+            )
+        with pytest.raises(WeightError, match="twice"):
+            WeightRating(
+                WeightBand.SEVERE, "d",
+                (
+                    WeightContribution("obj-fa-1", WeightCriterion.IRREVERSIBLE_HARM, "a"),
+                    WeightContribution("obj-fa-1", WeightCriterion.IRREVERSIBLE_HARM, "b"),
+                ),
+            )
+
+    def test_rating_exposes_its_citations(self):
+        rating = WeightRating(
+            WeightBand.MODERATE, "compounding",
+            (
+                WeightContribution("obj-fa-1", WeightCriterion.COMPOUNDING_COST, "a"),
+                WeightContribution("obj-fa-2", WeightCriterion.COMPOUNDING_COST, "b"),
+                WeightContribution("obj-fa-3", WeightCriterion.RECOVERABLE_FRICTION, "c"),
+            ),
+        )
+        assert rating.cited_facts == frozenset(
+            {"obj-fa-1", "obj-fa-2", "obj-fa-3"}
+        )
+        assert rating.facts_for(WeightCriterion.COMPOUNDING_COST) == frozenset(
+            {"obj-fa-1", "obj-fa-2"}
+        )
+        assert rating.facts_for(WeightCriterion.IRREVERSIBLE_HARM) == frozenset()
+
+    def test_detail_preserves_arbitrary_wording(self):
+        """The free text the old model carried survives, in the detail,
+        under a ratified band. [F-W1 R3, backward-compatible detail]"""
+        wording = "somewhere between annoying and existential, per the team"
+        assert wording in weight(WeightBand.MODERATE, ("obj-fa-1",), wording).detail
+
+
+class TestProblemWeightBoundary:
+    """The Problem boundary requires structured, supporting-set-bound
+    ratings. [P-V4, F-W1 R3]"""
+
+    def test_string_weight_is_rejected(self, allocator):
+        with pytest.raises(WeightError, match="required as a WeightRating"):
+            make_problem(allocator, severity="HIGH -- unnoticed loss")
+        with pytest.raises(WeightError, match="required as a WeightRating"):
+            make_problem(allocator, frequency="")
+
+    def test_phantom_weight_citation_is_rejected(self, allocator):
+        """The P-V5 phantom rule applied to weight: a rating may cite no
+        Fact outside the supporting set."""
+        with pytest.raises(WeightError, match="do not support this Problem"):
+            make_problem(
+                allocator, ("obj-fa-1", "obj-fa-2"),
+                severity=weight(WeightBand.SEVERE, ("obj-fa-1", "obj-phantom")),
+            )
+        with pytest.raises(WeightError, match="do not support this Problem"):
+            make_problem(
+                allocator, ("obj-fa-1", "obj-fa-2"),
+                frequency=weight(WeightBand.PERSISTENT, ("obj-phantom",)),
+            )
+
+    def test_increases_weight_over_recognises_raises_only(self, allocator):
+        refs = ("obj-fa-1", "obj-fa-2")
+        severe = make_problem(allocator, refs, severity=weight(WeightBand.SEVERE, refs))
+        moderate = make_problem(allocator, refs, severity=weight(WeightBand.MODERATE, refs))
+        persistent = make_problem(
+            allocator, refs,
+            severity=weight(WeightBand.MODERATE, refs),
+            frequency=weight(WeightBand.PERSISTENT, refs),
+        )
+        recurring = make_problem(
+            allocator, refs,
+            severity=weight(WeightBand.MODERATE, refs),
+            frequency=weight(WeightBand.RECURRING, refs),
+        )
+        assert moderate.increases_weight_over(severe) == ()  # decrease
+        assert severe.increases_weight_over(moderate) == ("severity",)
+        assert persistent.increases_weight_over(recurring) == ("frequency",)
+        assert recurring.increases_weight_over(persistent) == ()
+        both_raised = make_problem(
+            allocator, refs,
+            severity=weight(WeightBand.SEVERE, refs),
+            frequency=weight(WeightBand.PERSISTENT, refs),
+        )
+        assert both_raised.increases_weight_over(recurring) == (
+            "severity", "frequency",
+        )
+
+
+# ===========================================================================
+# T04.1.4 -- P-V4 at the boundary  [G]
+# ===========================================================================
+
+class TestPv4WeightForm:
+    def test_pv4_flags_phantom_weight_citations(self, allocator):
+        problem = make_problem(allocator)
+        object.__setattr__(
+            problem, "severity",
+            weight(WeightBand.SEVERE, ("obj-fa-1", "obj-not-supporting")),
+        )
+        result = pv4_weight_present(ctx(problem))
+        assert result.failed
+        assert "do not support" in result.detail
+
+
+# ===========================================================================
+# T04.1.4 -- P-I4 detective: the declared-criterion evidence ceiling  [D]
+# ===========================================================================
+
+class TestProblemIntegrityWeightCeiling:
+    """Facts establish an evidence ceiling; they do not determine the
+    asserted weight. The detective re-derives the ceiling from store
+    state, below the pre-write gate's verdict, never above it. [F-W1 R4]"""
+
+    def _refs(self, facts):
+        return tuple(f.object_id for f in facts)
+
+    def test_counts_never_select_a_band(self, store, allocator):
+        """4 available keys, SEVERE citing 2: clean. MINOR citing 2:
+        clean -- and never upgraded. The floor is uniform; surplus keys
+        assert nothing. [F-W1 R4: no ladder]"""
+        facts = write_facts(store, allocator, 4)
+        refs = self._refs(facts)
+        heavy = write_problem_from(
+            store, allocator, facts, severity=weight(WeightBand.SEVERE, refs[:2]),
+        )
+        light = write_problem_from(
+            store, allocator, facts, severity=weight(WeightBand.MINOR, refs[:2]),
+        )
+        violations = store.problems.integrity().verify()
+        assert not [
+            v for v in violations
+            if v.constraint_id == "P-I4" and v.object_id in
+            {heavy.object_id, light.object_id}
+        ]
+        assert (
+            store.get_problem(light.object_id).severity.band
+            is WeightBand.MINOR
+        )  # never upgraded
+
+    def test_phantom_citation_flagged(self, store, allocator, facts):
+        stored = write_problem_from(store, allocator, facts)
+        problem = store.get_problem(stored.object_id)
+        object.__setattr__(
+            problem, "severity",
+            weight(WeightBand.SEVERE, ("obj-fa-1", "obj-not-supporting")),
+        )
+        assert [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+            and v.object_id == stored.object_id
+            and "do not support" in v.detail
+        ]
+
+    def test_undeclared_band_criterion_flagged(self, store, allocator, facts):
+        """Form-valid rating (axis-coherent entries), but no entry declares
+        the asserted band's own criterion: the rating has no
+        evidence-linked backing."""
+        stored = write_problem_from(store, allocator, facts)
+        problem = store.get_problem(stored.object_id)
+        object.__setattr__(
+            problem, "severity",
+            # SEVERE band whose entries all declare MODERATE's criterion
+            WeightRating(
+                WeightBand.SEVERE, "SEVERE -- asserted",
+                tuple(
+                    WeightContribution(
+                        ref, WeightCriterion.COMPOUNDING_COST, "declares the wrong criterion"
+                    )
+                    for ref in self._refs(facts)
+                ),
+            ),
+        )
+        assert [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+            and v.object_id == stored.object_id
+            and "no justification entry declares IRREVERSIBLE_HARM" in v.detail
+        ]
+
+    def test_tampered_plain_text_severity_flagged(self, store, allocator, facts):
+        """A rating replaced by prose is a missing rating, not a passing
+        one: the F-W1 model is structural."""
+        stored = write_problem_from(store, allocator, facts)
+        problem = store.get_problem(stored.object_id)
+        object.__setattr__(problem, "severity", "EXTREME -- prose")
+        assert [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+            and v.object_id == stored.object_id
+            and "not a WeightRating" in v.detail
+        ]
+
+    def test_mixed_criteria_pass_when_declared_criterion_attested(
+        self, store, allocator, facts
+    ):
+        """Extra criteria in the justification cost nothing: only the
+        asserted band's own criterion must be declared and attested."""
+        facts = write_facts(store, allocator, 3)  # distinct Facts, one entry each
+        refs = self._refs(facts)
+        rating = WeightRating(
+            WeightBand.SEVERE, "SEVERE -- harm with compounding onset",
+            (
+                WeightContribution(refs[0], WeightCriterion.IRREVERSIBLE_HARM, "harm"),
+                WeightContribution(refs[1], WeightCriterion.IRREVERSIBLE_HARM, "harm"),
+                WeightContribution(refs[2], WeightCriterion.COMPOUNDING_COST, "onset"),
+            ),
+        )
+        write_problem_from(store, allocator, facts, severity=rating)
+        assert not [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+        ]
+
+    def test_non_active_evidence_drops_out_of_the_span(
+        self, store, allocator, facts
+    ):
+        """The span is re-derived from CURRENT store state: retracting one
+        Evidence halves the attestation and the ceiling no longer carries
+        the rating. [F-W1 R4 re-derivation]"""
+        refs = self._refs(facts)
+        stored = write_problem_from(store, allocator, facts)
+        # Each fixture Fact has its own Evidence; retract the first.
+        first_fact = store.get_fact(refs[0])
+        first_evidence_ref = first_fact.attachments[0].evidence_ref
+        store.transition(
+            first_evidence_ref, ObjectStatus.RETRACTED, "retracted upstream"
+        )
+        assert [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+            and v.object_id == stored.object_id
+            and "1 independence key" in v.detail
+        ]
+
+    def test_frequency_axis_judged_independently(self, store, allocator, facts):
+        refs = self._refs(facts)
+        stored = write_problem_from(
+            store, allocator, facts,
+            frequency=weight(WeightBand.PERSISTENT, refs[:1]),
+        )
+        assert [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+            and v.object_id == stored.object_id
+            and "frequency" in v.detail
+        ]
+
+    def test_deleted_citation_falls_below_the_floor(self, store, allocator, facts):
+        """The ceiling is re-derived from CURRENT store state: a rating
+        that cited a since-deleted Fact loses that Fact's keys. P-I2
+        reports the broken reference; P-I4 additionally reports that the
+        rating's span no longer carries it."""
+        refs = self._refs(facts)
+        stored = write_problem_from(store, allocator, facts)
+        # one supporting Fact vanishes -- object AND payload, so neither
+        # the object map nor the Fact registry can resolve it
+        del store._objects[refs[1]]
+        del store.facts._payloads[refs[1]]
+        violations = store.problems.integrity().verify()
+        assert any(v.constraint_id == "P-I2" for v in violations)
+        assert [
+            v for v in violations
+            if v.constraint_id == "P-I4"
+            and v.object_id == stored.object_id
+            and "1 independence key" in v.detail
+        ]
+
+    def test_payload_less_evidence_contributes_no_key(self, store, allocator, facts):
+        """A stored-but-payloadless Evidence (structural break) yields no
+        independence key: the span may fall, never be inflated."""
+        refs = self._refs(facts)
+        stored = write_problem_from(store, allocator, facts)
+        second_fact = store.get_fact(refs[1])
+        ev_ref = second_fact.attachments[0].evidence_ref
+        del store.evidence._payloads[ev_ref]  # payload lost, object remains
+        assert [
+            v for v in store.problems.integrity().verify()
+            if v.constraint_id == "P-I4"
+            and v.object_id == stored.object_id
+            and "1 independence key" in v.detail
+        ]
+
+
+# ===========================================================================
+# T04.1.4 -- store roundtrip  [G]
+# ===========================================================================
+
+class TestWeightStoreRoundtrip:
+    def test_rating_survives_write_and_read(self, store, allocator, facts):
+        refs = tuple(f.object_id for f in facts)
+        severity = weight(WeightBand.SEVERE, refs, "unnoticed loss reaches customers")
+        frequency = weight(WeightBand.RECURRING, refs, "multiple periods")
+        stored = write_problem_from(
+            store, allocator, facts, severity=severity, frequency=frequency,
+        )
+        payload = store.get_problem(stored.object_id)
+        assert payload.severity == severity
+        assert payload.frequency == frequency
+        assert payload.severity is not None
+        assert payload.severity.band is WeightBand.SEVERE
+        assert payload.severity.cited_facts == frozenset(refs)
+        assert payload.severity.facts_for(
+            WeightCriterion.IRREVERSIBLE_HARM
+        ) == frozenset(refs)

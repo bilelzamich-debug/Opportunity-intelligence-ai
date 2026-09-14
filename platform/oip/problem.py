@@ -6,13 +6,15 @@ Architecture References:
 - P-V1   supporting_facts non-empty; S-4 sufficiency threshold enforced
 - P-V2   problem_statement contains no solution, proposed or implied
 - P-V3   affected_population non-empty and specific
-- P-V4   severity and frequency present
+- P-V4   severity and frequency present as ratified ordinal ratings
 - P-V5   inference_basis references specific supporting Facts
 - P-V6   Not a restatement of a single Fact
 - P-I1   Remains solution-independent across all versions
 - P-I2   Every supporting Fact resolves and is ACTIVE
 - P-I3   Affected population never widened without supporting Facts
-- P-I4   Weight never asserted beyond what Facts support
+- P-I4   Weight never asserted beyond what Facts support; the F-W1
+         declared-criterion evidence ceiling (severity/frequency bands
+         checked against the cited Facts' independence-key span)
 - S-4    Problem sufficiency: 2 independent sources across supporting Facts
 - S-2    Support properties; P6 bounds support by contributing objects
 - S-3    Conservative treatment of undecidable text comparison
@@ -20,7 +22,8 @@ Architecture References:
 - R-6    Closed taxonomy: DERIVES_FROM Problem -> Fact; SUPPORTS Fact -> Problem
 - N-16   independent_source_count carried on every object
 - V7     Create authority: Problem Intelligence
-- M-12   Severity/frequency scales OPEN; bands land at T04.1.4
+- M-12   PARTIALLY CLOSED by F-W1 (T04.1.4): severity/frequency
+         ordinal bands ratified; population scales remain OPEN
 - M-21   Problem qualification criteria OPEN
 - M-22   Problem identity and deduplication OPEN; deliberately not implemented
 - IOM    section 3.3
@@ -38,15 +41,17 @@ Detection here is LEXICAL and therefore partial -- the IOM rates this failure
 caught is the explicit framing; implicit smuggling in otherwise neutral prose
 remains a residual risk, and problem qualification criteria are open [M-21].
 
-Scope: the Problem type and its rules. Inference itself is the Problem
-Intelligence Engine (T04.1.1); severity/frequency bands (T04.1.4) and
-deduplication (T04.1.5, M-22) are deliberately absent here.
+Scope: the Problem type and its rules, including the F-W1 weight model
+(T04.1.4): bands, criteria, WeightRating and the P-V4/P-I4 weight
+checks. Inference itself is the Problem Intelligence Engine (T04.1.1);
+deduplication (T04.1.5, M-22) is deliberately absent here.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Callable, Iterable
 
 from oip.acceptance import AcceptanceContext, RuleOutcome, RuleResult
@@ -288,6 +293,219 @@ class InferenceBasis:
 
 
 # ---------------------------------------------------------------------------
+# Weight model  [F-W1, T04.1.4]  -- severity and frequency ordinal bands
+# ---------------------------------------------------------------------------
+
+WEIGHT_ATTESTATION_FLOOR = 2
+"""Uniform sufficiency condition for a weight claim. [F-W1 R4, S-4]
+
+A criterion is defensible iff the justification entries declaring it cite
+Facts spanning at least this many distinct independence keys. This is
+S-4's own floor value applied to the weight claim itself ("an inference
+from a single source is that source's opinion") -- a sufficiency
+condition IDENTICAL for every band. It never selects a severity or
+frequency band, never raises a rating, and is never a ladder: more
+independent sources do not mean more weight (F-W1: Facts establish an
+evidence ceiling; they do not automatically determine the asserted
+weight)."""
+
+
+class WeightBand(str, Enum):
+    """Ratified ordinal weight bands. [F-W1 R1/R2, M-12 partially closed]
+
+    Three bands per axis, no more: severity characterises how damaging the
+    problem is when it occurs; frequency characterises how often it occurs
+    for the affected population. No quantitative formula, no rate
+    vocabulary (B-37 Option 3 rejected).
+    """
+
+    # Severity axis [F-W1 R1]
+    MINOR = "MINOR"
+    MODERATE = "MODERATE"
+    SEVERE = "SEVERE"
+    # Frequency axis [F-W1 R2]
+    EPISODIC = "EPISODIC"
+    RECURRING = "RECURRING"
+    PERSISTENT = "PERSISTENT"
+
+
+class WeightCriterion(str, Enum):
+    """The observable criteria behind the bands. [F-W1 R1/R2, S-1 style]
+
+    A criterion is a CONTENT claim -- "the cited Fact explicitly evidences
+    this" -- never a count: which band a Problem can claim is a function
+    of what the evidence states, not of how much evidence there is.
+    """
+
+    # Severity criteria [F-W1 R1]
+    RECOVERABLE_FRICTION = "RECOVERABLE_FRICTION"
+    COMPOUNDING_COST = "COMPOUNDING_COST"
+    IRREVERSIBLE_HARM = "IRREVERSIBLE_HARM"
+    # Frequency criteria [F-W1 R2]
+    OCCURRENCE = "OCCURRENCE"
+    REPETITION = "REPETITION"
+    CONTINUITY = "CONTINUITY"
+
+
+SEVERITY_BANDS = frozenset(
+    {WeightBand.MINOR, WeightBand.MODERATE, WeightBand.SEVERE}
+)
+FREQUENCY_BANDS = frozenset(
+    {WeightBand.EPISODIC, WeightBand.RECURRING, WeightBand.PERSISTENT}
+)
+
+_BAND_OF_CRITERION: dict[WeightCriterion, WeightBand] = {
+    WeightCriterion.RECOVERABLE_FRICTION: WeightBand.MINOR,
+    WeightCriterion.COMPOUNDING_COST: WeightBand.MODERATE,
+    WeightCriterion.IRREVERSIBLE_HARM: WeightBand.SEVERE,
+    WeightCriterion.OCCURRENCE: WeightBand.EPISODIC,
+    WeightCriterion.REPETITION: WeightBand.RECURRING,
+    WeightCriterion.CONTINUITY: WeightBand.PERSISTENT,
+}
+_CRITERION_OF_BAND: dict[WeightBand, WeightCriterion] = {
+    band: criterion for criterion, band in _BAND_OF_CRITERION.items()
+}
+
+_BAND_RANK: dict[WeightBand, int] = {
+    WeightBand.MINOR: 0,
+    WeightBand.MODERATE: 1,
+    WeightBand.SEVERE: 2,
+    WeightBand.EPISODIC: 0,
+    WeightBand.RECURRING: 1,
+    WeightBand.PERSISTENT: 2,
+}
+
+
+def criterion_for(band: WeightBand) -> WeightCriterion:
+    """The ratified criterion of a band (bijection). [F-W1 R1/R2]"""
+    return _CRITERION_OF_BAND[band]
+
+
+def band_of(criterion: WeightCriterion) -> WeightBand:
+    """The ratified band of a criterion (bijection). [F-W1 R1/R2]"""
+    return _BAND_OF_CRITERION[criterion]
+
+
+def band_rank(band: WeightBand) -> int:
+    """Ordinal position of a band within its own axis. [F-W1 R5]
+
+    Only defined within an axis: severity and frequency are never compared
+    to each other, and a rank never selects a band -- it only recognises a
+    versioned INCREASE so the F-W1 R5 gate can demand the additional
+    supporting Facts that justify it.
+    """
+    return _BAND_RANK[band]
+
+
+@dataclass(frozen=True)
+class WeightContribution:
+    """What one supporting Fact evidences toward a weight rating. [F-W1 R3]
+
+    The weight analogue of FactContribution (P-V5): structured rather than
+    prose, so "each rating traceable to Facts" is mechanically checkable.
+    The typed criterion declares which band criterion the cited Fact
+    evidences. The engine verifies the FORM (non-empty, typed, subset,
+    axis) and the ATTESTATION (independence-key span) -- never the truth
+    of a declaration against the Fact's content: declaration fidelity is
+    the inferer's responsibility, sampled by the F-A1 audit; no NLP, no
+    LLM, no network [M-67 open, N-4].
+    """
+
+    fact_ref: str
+    criterion: WeightCriterion
+    contribution: str
+
+    def __post_init__(self) -> None:
+        if not (self.fact_ref or "").strip():
+            raise WeightError(
+                "a weight contribution must name the Fact it comes from "
+                "[F-W1 R3, P-V4]"
+            )
+        if not isinstance(self.criterion, WeightCriterion):
+            raise WeightError(
+                f"criterion {self.criterion!r} is not a ratified "
+                f"WeightCriterion [F-W1 R1/R2]"
+            )
+        if not (self.contribution or "").strip():
+            raise WeightError(
+                f"contribution of {self.fact_ref!r} is empty; the rating "
+                f"would rest on an unstated step [F-W1 R3]"
+            )
+
+
+@dataclass(frozen=True)
+class WeightRating:
+    """One axis of the Problem's weight. [F-W1 R3, P-V4]
+
+    band: the asserted ordinal rating (inferer-supplied, N-4). detail:
+    preserved free text -- the explanatory content the free-text model
+    carried, kept for backward-compatible explanatory detail. Justification
+    entries: the FactContribution-style mechanism applied to weight, each
+    citing one supporting Fact and declaring the criterion it evidences.
+
+    Construction checks FORM only: valid band for the axis, non-empty
+    detail, non-empty justification, criteria on the rating's axis, no Fact
+    cited twice. Attestation (>= WEIGHT_ATTESTATION_FLOOR independence
+    keys) and the evidence ceiling are checked by the engine before any
+    state change and re-checked by P-I4 afterwards -- the engine bounds,
+    never derives and never upgrades [F-W1 R4].
+    """
+
+    band: WeightBand
+    detail: str
+    justification: tuple[WeightContribution, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.band, WeightBand):
+            raise WeightError(
+                f"band {self.band!r} is not a ratified WeightBand "
+                f"[F-W1 R1/R2, P-V4]"
+            )
+        axis = "severity" if self.band in SEVERITY_BANDS else "frequency"
+        if not (self.detail or "").strip():
+            raise WeightError(
+                f"{axis} detail is required; the preserved free text "
+                f"explains the rating [F-W1 R3, P-V4]"
+            )
+        if not self.justification:
+            raise WeightError(
+                f"{axis} justification is required; a rating must be "
+                f"traceable to Facts [F-W1 R3, P-V4]"
+            )
+        bands = SEVERITY_BANDS if axis == "severity" else FREQUENCY_BANDS
+        off_axis = sorted(
+            c.criterion.value
+            for c in self.justification
+            if band_of(c.criterion) not in bands
+        )
+        if off_axis:
+            raise WeightError(
+                f"criterion mismatch: {off_axis} do not describe the "
+                f"{axis} band {self.band.value}; each axis is rated on "
+                f"its own criteria [F-W1 R1/R2]"
+            )
+        refs = [c.fact_ref for c in self.justification]
+        if len(set(refs)) != len(refs):
+            raise WeightError(
+                "the same Fact justifies the rating twice; corroboration "
+                "cannot be manufactured by repetition [F-W1 R3, P-V1]"
+            )
+
+    @property
+    def cited_facts(self) -> frozenset[str]:
+        """Every Fact cited by this rating's justification. [F-W1 R3]"""
+        return frozenset(c.fact_ref for c in self.justification)
+
+    def facts_for(self, criterion: WeightCriterion) -> frozenset[str]:
+        """The Facts whose entries declare this criterion. [F-W1 R3/R4]"""
+        return frozenset(
+            c.fact_ref
+            for c in self.justification
+            if c.criterion is criterion
+        )
+
+
+# ---------------------------------------------------------------------------
 # Problem
 # ---------------------------------------------------------------------------
 
@@ -304,8 +522,8 @@ class Problem:
     problem_statement: str
     affected_population: str
     supporting_facts: tuple[str, ...]
-    severity: str
-    frequency: str
+    severity: WeightRating
+    frequency: WeightRating
     problem_domain: str
     inference_basis: InferenceBasis
 
@@ -335,10 +553,17 @@ class Problem:
                 "affected_population is required; without it the deficiency "
                 "belongs to nobody and cannot be sized [P-V3]"
             )
-        if not (self.severity or "").strip():
-            raise WeightError("severity is required [P-V4]")
-        if not (self.frequency or "").strip():
-            raise WeightError("frequency is required [P-V4]")
+        # F-W1 R3: each axis is a structured WeightRating. The rating
+        # type itself guarantees non-empty detail and justification,
+        # so presence is structural.
+        for name, rating in (("severity", self.severity),
+                             ("frequency", self.frequency)):
+            if not isinstance(rating, WeightRating):
+                raise WeightError(
+                    f"{name} is required as a WeightRating (band, "
+                    f"detail, evidence-linked justification) "
+                    f"[P-V4, F-W1 R3]"
+                )
         if not (self.problem_domain or "").strip():
             raise ProblemError("problem_domain is required [IOM section 3.3]")
         if not isinstance(self.inference_basis, InferenceBasis):
@@ -384,6 +609,21 @@ class Problem:
                 f"inference_basis cites {phantom}, which do not support this "
                 f"Problem [P-V5]"
             )
+
+        # F-W1 R3: a weight rating may not cite a Fact that does not
+        # support the Problem either -- the P-V5 phantom rule applied
+        # to weight. (Both ratings are WeightRating by the presence
+        # loop above.) P-V4 re-checks the same subset at acceptance.
+        for name, rating in (("severity", self.severity),
+                             ("frequency", self.frequency)):
+            weight_phantom = sorted(
+                rating.cited_facts - set(self.supporting_facts)
+            )
+            if weight_phantom:
+                raise WeightError(
+                    f"{name} rating cites {weight_phantom}, which do "
+                    f"not support this Problem [P-V4, F-W1 R3]"
+                )
 
         if self.population_size_estimate is not None:
             if self.population_size_estimate < 0:
@@ -466,6 +706,24 @@ class Problem:
     def adds_support_over(self, earlier: "Problem") -> bool:
         """Whether this version rests on strictly more Facts. [P-I3]"""
         return set(earlier.supporting_facts) < set(self.supporting_facts)
+
+    def increases_weight_over(self, earlier: "Problem") -> tuple[str, ...]:
+        """Axes on which this version asserts a HIGHER band. [F-W1 R5]
+
+        Ordered severity-then-frequency, matching the engine's
+        evaluation order. Equal or lower bands are not increases:
+        decreases need no additional support, and a justification-only
+        revision (equal bands, changed detail or citations) versions
+        without increasing the weight. The rank never selects a band
+        -- it only recognises an increase so the F-W1 R5 gate can
+        demand the additional supporting Facts that justify it.
+        """
+        raised: list[str] = []
+        if band_rank(self.severity.band) > band_rank(earlier.severity.band):
+            raised.append("severity")
+        if band_rank(self.frequency.band) > band_rank(earlier.frequency.band):
+            raised.append("frequency")
+        return tuple(raised)
 
 
 # ---------------------------------------------------------------------------
@@ -581,10 +839,17 @@ def pv3_population_specific(ctx: AcceptanceContext) -> RuleResult:
 
 
 def pv4_weight_present(ctx: AcceptanceContext) -> RuleResult:
-    """severity and frequency present. [P-V4]
+    """severity and frequency present as ratified ordinal ratings. [P-V4]
 
-    Presence only. No ordinal scale exists yet -- M-12 is open and the bands
-    land at T04.1.4 -- so no ordering or comparison is asserted here.
+    Form checks at the authoritative write boundary, per F-W1 (T04.1.4):
+    each axis is a WeightRating whose citations stay within the supporting
+    set -- the P-V5 phantom rule applied to weight. Band validity, detail,
+    justification and axis coherence are structural (checked at rating
+    construction). Attestation (>=2 independence keys) and the evidence
+    ceiling are the engine's pre-write gate and P-I4's detective; P-V4
+    itself never orders bands, never derives a rating and never upgrades
+    one -- Facts establish an evidence ceiling, they do not determine the
+    asserted weight [F-W1 R4].
     """
     if ctx.attributes.object_type is not ObjectType.PROBLEM:
         return _skip("P-V4", "not a Problem")
@@ -592,16 +857,26 @@ def pv4_weight_present(ctx: AcceptanceContext) -> RuleResult:
     if problem is None:
         return _skip("P-V4", "no Problem payload supplied")
 
-    missing = [
-        name
-        for name in ("severity", "frequency")
-        if not (getattr(problem, name) or "").strip()
-    ]
-    if missing:
-        return _fail(
-            "P-V4", f"weight incomplete: {sorted(missing)}"
-        )
-    return _ok("P-V4", "severity and frequency present; no scale defined [M-12]")
+    for name in ("severity", "frequency"):
+        rating = getattr(problem, name)
+        if not isinstance(rating, WeightRating):
+            return _fail(
+                "P-V4",
+                f"weight incomplete: {name} is not a WeightRating "
+                f"[F-W1 R3]",
+            )
+        phantom = sorted(rating.cited_facts - set(problem.supporting_facts))
+        if phantom:
+            return _fail(
+                "P-V4",
+                f"{name} rating cites {phantom}, which do not support "
+                f"this Problem [F-W1 R3]",
+            )
+    return _ok(
+        "P-V4",
+        "severity and frequency present as F-W1 ordinal ratings, "
+        "citations within the supporting set [M-12 partially closed]",
+    )
 
 
 def pv5_inference_basis_references_facts(ctx: AcceptanceContext) -> RuleResult:
@@ -888,8 +1163,16 @@ class ProblemIntegrity:
         counts more than once here; collapsing it requires independence
         grouping, which is T02.1.3 and remains open [M-23].
 
-        Severity and frequency themselves are NOT compared: no scale exists
-        (M-12), and inventing an ordering here would pre-empt T04.1.4.
+        Fourth, the ordinal bound (T04.1.4): the F-W1 declared-criterion
+        evidence ceiling. Facts establish an evidence ceiling; they do not
+        automatically determine the asserted weight [F-W1 R4]. A criterion
+        is defensible iff the rating's entries declaring it cite Facts
+        spanning >= WEIGHT_ATTESTATION_FLOOR independence keys -- the S-4
+        floor value, IDENTICAL for every band: a sufficiency condition,
+        never a classifier, never a ladder. The asserted band's own
+        criterion must be declared and defensible. Ratings BELOW the
+        ceiling are never violations: the platform never upgrades an
+        under-assertion [F-W1 R4].
         """
         violations: list[ProblemViolation] = []
         for object_id, problem in self._all_problems():
@@ -940,7 +1223,90 @@ class ProblemIntegrity:
                         f"weakest supporting Fact's {ceiling} [S-2 P6]",
                     )
                 )
+
+            # -- the ordinal bound: the F-W1 evidence ceiling. [T04.1.4]
+            # Severity is judged before frequency, matching the engine's
+            # evaluation order. Each axis independently. Unresolved
+            # supporting Facts were already skipped by the numeric
+            # block's resolved == 0 guard, and unresolved citations
+            # simply contribute no key below -- P-I2 owns the broken
+            # references either way.
+            for axis, rating in (
+                ("severity", problem.severity),
+                ("frequency", problem.frequency),
+            ):
+                if not isinstance(rating, WeightRating):
+                    violations.append(
+                        ProblemViolation(
+                            "P-I4", object_id,
+                            f"{axis} is not a WeightRating; the weight "
+                            f"model of F-W1 is absent [P-V4, F-W1 R3]",
+                        )
+                    )
+                    continue
+                weight_phantom = sorted(
+                    rating.cited_facts - set(problem.supporting_facts)
+                )
+                if weight_phantom:
+                    violations.append(
+                        ProblemViolation(
+                            "P-I4", object_id,
+                            f"{axis} rating cites {weight_phantom}, which "
+                            f"do not support this Problem; weight is "
+                            f"asserted beyond the supporting Facts "
+                            f"[F-W1 R3]",
+                        )
+                    )
+                    continue
+                criterion = criterion_for(rating.band)
+                cited = rating.facts_for(criterion)
+                if not cited:
+                    violations.append(
+                        ProblemViolation(
+                            "P-I4", object_id,
+                            f"asserts {axis} {rating.band.value} but no "
+                            f"justification entry declares "
+                            f"{criterion.value}; the rating has no "
+                            f"evidence-linked backing [F-W1 R4]",
+                        )
+                    )
+                    continue
+                span = self._independence_keys_beneath(cited)
+                if len(span) < WEIGHT_ATTESTATION_FLOOR:
+                    violations.append(
+                        ProblemViolation(
+                            "P-I4", object_id,
+                            f"asserts {axis} {rating.band.value} "
+                            f"({criterion.value}) but its cited Facts span "
+                            f"only {len(span)} independence key(s) "
+                            f"{sorted(span)}; the evidence ceiling does "
+                            f"not carry the rating [F-W1 R4, S-4]",
+                        )
+                    )
         return violations
+
+    def _independence_keys_beneath(self, fact_refs: Iterable[str]) -> set[str]:
+        """Distinct independence keys of ACTIVE Evidence beneath the given
+        Facts. [N-16, F-W1 R4]
+
+        Unresolved Facts contribute nothing (P-I2 reports them); non-ACTIVE
+        Evidence contributes no key -- the span may fall, never be
+        inflated. Mirrors the engine's resolution semantics exactly, so
+        the detective and the pre-write gate can never disagree.
+        """
+        keys: set[str] = set()
+        for fact_ref in fact_refs:
+            fact = self.store.get_fact(fact_ref)
+            if fact is None:
+                continue
+            for attachment in fact.attachments:
+                stored = self.store.find(attachment.evidence_ref)
+                if stored is None or stored.status is not ObjectStatus.ACTIVE:
+                    continue
+                evidence = self.store.evidence.get(attachment.evidence_ref)
+                if evidence is not None:
+                    keys.add(evidence.independence_key)
+        return keys
 
 
 # ---------------------------------------------------------------------------
